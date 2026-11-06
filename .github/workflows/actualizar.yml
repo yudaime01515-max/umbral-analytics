@@ -21,6 +21,7 @@ jobs:
       - name: Calcular pronósticos y cerrar resultados
         env:
           API_SPORTS_KEY: ${{ secrets.API_SPORTS_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
           UMBRAL_DATA_DIR: public/data
           UMBRAL_CACHE_DIR: /tmp/umbral-cache
         run: |
