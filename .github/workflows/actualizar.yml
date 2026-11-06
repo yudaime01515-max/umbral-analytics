@@ -1,0 +1,37 @@
+name: Actualizar pronósticos
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Calcular pronósticos y cerrar resultados
+        env:
+          API_SPORTS_KEY: ${{ secrets.API_SPORTS_KEY }}
+          UMBRAL_DATA_DIR: public/data
+          UMBRAL_CACHE_DIR: /tmp/umbral-cache
+        run: |
+          php update.php
+          echo "----- registro -----"
+          cat /tmp/umbral-cache/update.log || true
+
+      - name: Guardar los datos nuevos
+        run: |
+          git config user.name "umbral-bot"
+          git config user.email "umbral-bot@users.noreply.github.com"
+          git add public/data/pronosticos.json public/data/historial.json
+          git commit -m "Actualizar pronósticos" || echo "Sin cambios"
+          git push
