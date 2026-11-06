@@ -1,5 +1,7 @@
 <?php
-$envKey = getenv('API_SPORTS_KEY');
+$envKey = getenv('API_SPORTS_KEY');          // clave de API-Sports (desde GitHub)
+$fdKey  = getenv('FOOTBALL_DATA_KEY');       // clave de football-data.org (desde GitHub)
+$apiSportsPaid = getenv('API_SPORTS_PAID') === '1'; // pon API_SPORTS_PAID=1 si pagas el plan Pro
 /**
  * Umbral Analytics — configuración
  * Es el único archivo que necesitas editar.
@@ -14,9 +16,12 @@ return [
     // Clave de API-Sports (https://dashboard.api-football.com). Una sola cuenta sirve para todos los deportes.
     'api_key'      => $envKey ?: 'PEGA_AQUI_TU_API_KEY',
 
+    // Clave de football-data.org (gratis, solo fútbol, 12 competiciones de la temporada actual)
+    'football_data_key' => $fdKey ?: '',
+
     // Modo prueba: true = usa datos simulados de la carpeta mock/ (no gasta consultas). Pon false para datos reales.
     // (Si la clave viene de GitHub, el modo prueba se apaga solo)
-    'mock'         => $envKey ? false : true,
+    'mock'         => ($envKey || $fdKey) ? false : true,
 
     // Zona horaria de la web
     'timezone'     => 'America/Lima',
@@ -45,7 +50,18 @@ return [
         'futbol' => [
             'name' => 'Fútbol', 'host' => 'https://v3.football.api-sports.io', 'endpoint' => 'fixtures',
             'model' => 'poisson_draw',
-            'leagues' => [
+            // Con clave de football-data.org el fútbol sale de ahí (gratis); si no, de API-Sports
+            'source' => $fdKey ? 'footballdata' : 'apisports',
+            'leagues' => $fdKey ? [
+                ['code' => 'PL',  'name' => 'Premier League',   'on' => true],
+                ['code' => 'PD',  'name' => 'LaLiga',           'on' => true],
+                ['code' => 'SA',  'name' => 'Serie A',          'on' => true],
+                ['code' => 'BL1', 'name' => 'Bundesliga',       'on' => true],
+                ['code' => 'FL1', 'name' => 'Ligue 1',          'on' => true],
+                ['code' => 'CL',  'name' => 'Champions League', 'on' => true],
+                ['code' => 'PPL', 'name' => 'Primeira Liga',    'on' => true],
+                ['code' => 'DED', 'name' => 'Eredivisie',       'on' => true],
+            ] : [
                 ['id' => 281, 'season' => 2026, 'name' => 'Liga 1 Perú',     'on' => true],
                 ['id' => 39,  'season' => 2026, 'name' => 'Premier League',  'on' => true],
                 ['id' => 140, 'season' => 2026, 'name' => 'LaLiga',          'on' => true],
@@ -56,6 +72,7 @@ return [
             ],
         ],
         'basquet' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Básquet', 'host' => 'https://v1.basketball.api-sports.io', 'endpoint' => 'games',
             'model' => 'normal', 'sd' => 12.5, 'tsd' => 17, 'alt' => 7, 'talt' => 13, 'home' => 2.5,
             'leagues' => [
@@ -63,6 +80,7 @@ return [
             ],
         ],
         'beisbol' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Béisbol', 'host' => 'https://v1.baseball.api-sports.io', 'endpoint' => 'games',
             'model' => 'poisson_ot', 'unit' => 'carreras', 'alt' => 2,
             'leagues' => [
@@ -70,6 +88,7 @@ return [
             ],
         ],
         'nfl' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Fútbol americano', 'host' => 'https://v1.american-football.api-sports.io', 'endpoint' => 'games',
             'model' => 'normal', 'sd' => 13.5, 'tsd' => 10, 'alt' => 7, 'talt' => 9, 'home' => 2,
             'leagues' => [
@@ -77,6 +96,7 @@ return [
             ],
         ],
         'hockey' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Hockey', 'host' => 'https://v1.hockey.api-sports.io', 'endpoint' => 'games',
             'model' => 'poisson_ot', 'unit' => 'goles', 'alt' => 1,
             'leagues' => [
@@ -84,6 +104,7 @@ return [
             ],
         ],
         'voley' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Vóley', 'host' => 'https://v1.volleyball.api-sports.io', 'endpoint' => 'games',
             'model' => 'sets5',
             'leagues' => [
@@ -92,6 +113,7 @@ return [
             ],
         ],
         'balonmano' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Balonmano', 'host' => 'https://v1.handball.api-sports.io', 'endpoint' => 'games',
             'model' => 'normal', 'sd' => 6, 'tsd' => 7, 'alt' => 3, 'talt' => 5, 'home' => 1.5,
             'leagues' => [
@@ -99,6 +121,7 @@ return [
             ],
         ],
         'rugby' => [
+            'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Rugby', 'host' => 'https://v1.rugby.api-sports.io', 'endpoint' => 'games',
             'model' => 'normal', 'sd' => 14, 'tsd' => 12, 'alt' => 8, 'talt' => 10, 'home' => 3,
             'leagues' => [

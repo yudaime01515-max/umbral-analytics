@@ -42,12 +42,13 @@ $sportsOut = [];
 $finalScores = [];
 
 foreach ($cfg['sports'] as $sportKey => $sport) {
+    if (isset($sport['enabled']) && !$sport['enabled']) continue;
     $any = false;
     foreach ($sport['leagues'] as $league) {
-        if (empty($league['on']) || empty($league['id'])) continue;
+        if (empty($league['on']) || (empty($league['id']) && empty($league['code']))) continue;
         $any = true;
         $raw = api_get($cfg, $sportKey, $sport, $league);
-        $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name']), $raw)));
+        $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name'], $sport['source'] ?? 'apisports'), $raw)));
 
         $finished = array_values(array_filter($games, fn($g) => in_array($g['status'], FINISHED, true) && $g['hs'] !== null && $g['ts'] < $now));
         foreach ($games as $g) {

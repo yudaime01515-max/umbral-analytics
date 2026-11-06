@@ -12,12 +12,17 @@ const VOID_STATUS = ['PST', 'CANC', 'ABD', 'AWD', 'WO', 'POST', 'INTR', 'SUSP'];
 function api_get(array $cfg, string $sportKey, array $sport, array $league): array
 {
     $root = dirname(__DIR__);
-    $file = sprintf('%s-%s-%s.json', $sportKey, $league['id'], preg_replace('/[^0-9A-Za-z-]/', '', (string)$league['season']));
+    $fd = ($sport['source'] ?? 'apisports') === 'footballdata';
+    $listKey = $fd ? 'matches' : 'response';
+    $file = $fd
+        ? sprintf('%s-fd-%s.json', $sportKey, preg_replace('/[^0-9A-Za-z]/', '', $league['code']))
+        : sprintf('%s-%s-%s.json', $sportKey, $league['id'], preg_replace('/[^0-9A-Za-z-]/', '', (string)$league['season']));
 
     if (!empty($cfg['mock'])) {
         $path = "$root/mock/$file";
         if (!is_file($path)) return [];
-        $resp = json_decode(file_get_contents($path), true)['response'] ?? [];
+        $resp = json_decode(file_get_contents($path), true)[$listKey] ?? [];
+        if ($fd) return $resp;
         return mock_mask($sportKey, $resp, (int)($GLOBALS['UMBRAL_NOW'] ?? time()));
     }
 
@@ -25,42 +30,80 @@ function api_get(array $cfg, string $sportKey, array $sport, array $league): arr
     if (!is_dir($cacheDir)) mkdir($cacheDir, 0775, true);
     $cachePath = "$cacheDir/$file";
     if (is_file($cachePath) && filemtime($cachePath) > time() - $cfg['cache_minutes'] * 60) {
-        return json_decode(file_get_contents($cachePath), true)['response'] ?? [];
+        return json_decode(file_get_contents($cachePath), true)[$listKey] ?? [];
     }
 
+    if ($fd) {
+        $base = getenv('FD_BASE') ?: 'https://api.football-data.org/v4';
+        $url = $base . '/competitions/' . urlencode($league['code']) . '/matches';
+        $headers = ['X-Auth-Token: ' . $cfg['football_data_key']];
+    } else {
     $url = sprintf('%s/%s?league=%s&season=%s&timezone=%s',
         $sport['host'], $sport['endpoint'], urlencode((string)$league['id']), urlencode((string)$league['season']), urlencode($cfg['timezone']));
+        $headers = ['x-apisports-key: ' . $cfg['api_key']];
+    }
+    $respHeaders = [];
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTPHEADER => ['x-apisports-key: ' . $cfg['api_key']],
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$respHeaders) {
+            $p = explode(':', $h, 2);
+            if (count($p) === 2) $respHeaders[strtolower(trim($p[0]))] = trim($p[1]);
+            return strlen($h);
+        },
     ]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $err  = curl_error($ch);
     curl_close($ch);
+    if ($fd) {
+        // football-data.org: respeta el límite por minuto según sus cabeceras
+        $left = $respHeaders['x-requests-available-minute'] ?? null;
+        $reset = (int)($respHeaders['x-requestcounter-reset'] ?? 60);
+        if ($left !== null && (int)$left <= 1) sleep(min(65, $reset + 1));
+        else usleep(1500000);
+    }
 
     if ($body === false || $code !== 200) {
         $GLOBALS['UMBRAL_ERRORS'] = ($GLOBALS['UMBRAL_ERRORS'] ?? 0) + 1;
         log_line("ERROR $sportKey/{$league['name']}: HTTP $code $err");
         // si falla, usa la última copia guardada aunque esté vieja
-        return is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true)['response'] ?? []) : [];
+        return is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true)[$listKey] ?? []) : [];
     }
     $json = json_decode($body, true);
-    if (!empty($json['errors'])) {
+    if (!$fd && !empty($json['errors'])) {
         $GLOBALS['UMBRAL_ERRORS'] = ($GLOBALS['UMBRAL_ERRORS'] ?? 0) + 1;
         log_line("ERROR $sportKey/{$league['name']}: " . json_encode($json['errors'], JSON_UNESCAPED_UNICODE));
-        return is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true)['response'] ?? []) : [];
+        return is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true)[$listKey] ?? []) : [];
     }
     file_put_contents($cachePath, $body);
-    log_line("OK $sportKey/{$league['name']}: " . count($json['response'] ?? []) . ' partidos');
-    return $json['response'] ?? [];
+    log_line("OK $sportKey/{$league['name']}: " . count($json[$listKey] ?? []) . ' partidos');
+    return $json[$listKey] ?? [];
 }
 
 /** Normaliza un partido de cualquier deporte. */
-function normalize(string $sportKey, array $g, string $leagueName): ?array
+function normalize(string $sportKey, array $g, string $leagueName, string $source = 'apisports'): ?array
 {
+    if ($source === 'footballdata') {
+        $map = ['FINISHED' => 'FT', 'AWARDED' => 'AW', 'SCHEDULED' => 'NS', 'TIMED' => 'NS', 'POSTPONED' => 'PST',
+                'CANCELLED' => 'CANC', 'SUSPENDED' => 'SUSP', 'IN_PLAY' => 'LIVE', 'PAUSED' => 'LIVE', 'LIVE' => 'LIVE'];
+        // Resultado de los 90 minutos: en copas con prórroga usa regularTime
+        $sc = $g['score']['regularTime'] ?? $g['score']['fullTime'] ?? [];
+        $hs = $sc['home'] ?? null; $as = $sc['away'] ?? null;
+        return [
+            'id' => 'futbol-fd-' . ($g['id'] ?? 0),
+            'ts' => (int)strtotime($g['utcDate'] ?? ''),
+            'status' => $map[$g['status'] ?? ''] ?? 'NS',
+            'league' => $leagueName,
+            'home' => $g['homeTeam']['shortName'] ?? $g['homeTeam']['name'] ?? '?',
+            'away' => $g['awayTeam']['shortName'] ?? $g['awayTeam']['name'] ?? '?',
+            'home_id' => $g['homeTeam']['id'] ?? 0, 'away_id' => $g['awayTeam']['id'] ?? 0,
+            'logo_home' => $g['homeTeam']['crest'] ?? '', 'logo_away' => $g['awayTeam']['crest'] ?? '',
+            'hs' => $hs === null ? null : (int)$hs, 'as' => $as === null ? null : (int)$as,
+        ];
+    }
     if ($sportKey === 'futbol') {
         $fx = $g['fixture'] ?? [];
         $hs = $g['score']['fulltime']['home'] ?? $g['goals']['home'] ?? null;
