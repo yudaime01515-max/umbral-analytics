@@ -1,0 +1,9 @@
+# Netlify publica solo la carpeta "public". El código y la configuración no quedan visibles.
+[build]
+  publish = "public"
+  command = ""
+
+[[headers]]
+  for = "/data/*"
+  [headers.values]
+    Cache-Control = "no-cache"

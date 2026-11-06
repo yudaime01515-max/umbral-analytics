@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Umbral Analytics</title>
+<meta name="description" content="Probabilidades deportivas calculadas con modelos estadísticos. Solo publicamos los pronósticos que superan el umbral.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  /* Plan: pizarra de estadio nocturna. Todo gira alrededor de un número: el umbral. */
+  --bg:#090E1A;
+  --panel:#101828;
+  --panel-2:#16203A;
+  --line:#22304C;
+  --text:#EEF2F8;
+  --muted:#9AA6BC;
+  --accent:#FF5A36;
+  --accent-soft:rgba(255,90,54,.14);
+  --good:#34D399;
+  --bad:#F87171;
+  --display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;
+  --body:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.5}
+body{min-height:100%}
+a{color:var(--text)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+.mono{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3{text-wrap:balance;margin:0}
+
+/* Franja legal */
+.legal-strip{background:var(--accent);color:#170A05;font-size:13px;font-weight:600;text-align:center;padding:7px 16px}
+.legal-strip b{border:1.5px solid #170A05;border-radius:4px;padding:0 5px;margin-right:6px}
+
+/* Cabecera */
+header.top{border-bottom:1px solid var(--line);background:rgba(9,14,26,.92);position:sticky;top:0;z-index:20;backdrop-filter:blur(8px)}
+.top-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;max-width:1240px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand-mark{width:38px;height:38px;border-radius:10px;background:var(--accent);display:grid;place-items:center}
+.brand-name{font-family:var(--display);font-weight:900;font-size:26px;letter-spacing:.02em;line-height:1;text-transform:uppercase}
+.brand-name span{color:var(--accent)}
+nav.views{display:flex;gap:4px;flex-wrap:wrap}
+nav.views a{padding:9px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;color:var(--muted)}
+nav.views a[aria-current="page"]{background:var(--panel-2);color:var(--text)}
+nav.views a:hover{color:var(--text)}
+.demo-pill{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:6px 10px;border-radius:999px}
+
+/* Héroe: el umbral */
+.hero{padding:44px 0 28px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end}
+.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,7vw,92px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p.lead{color:var(--muted);max-width:56ch;font-size:17px;margin:16px 0 0}
+.big-threshold{text-align:right}
+.big-threshold .val{font-family:var(--display);font-weight:900;font-size:clamp(88px,13vw,168px);line-height:.82;color:var(--accent);display:block}
+.big-threshold .lbl{color:var(--muted)}
+.ruler-card{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px 20px 14px}
+.ruler-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
+.ruler-head strong{font-size:18px}
+.ruler-head .stat{color:var(--muted);font-size:14px}
+.ruler-head .stat b{color:var(--text)}
+.ruler{position:relative;height:150px}
+.ruler canvas{position:absolute;inset:0;width:100%;height:100%}
+.ruler input[type=range]{position:absolute;left:0;right:0;bottom:0;top:0;width:100%;height:100%;margin:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:ew-resize}
+.ruler input[type=range]::-webkit-slider-runnable-track{height:100%;background:transparent}
+.ruler input[type=range]::-moz-range-track{height:100%;background:transparent}
+.ruler input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:150px;background:transparent;border:0}
+.ruler input[type=range]::-moz-range-thumb{width:28px;height:150px;background:transparent;border:0}
+.ruler input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.ruler-scale{display:flex;justify-content:space-between;margin-top:6px;color:var(--muted)}
+.ruler-hint{color:var(--muted);font-size:13px;margin-top:8px}
+
+/* Barra de filtros */
+.filters{display:flex;flex-direction:column;gap:14px;padding:26px 0 8px}
+.sports{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:15px;white-space:nowrap;cursor:pointer}
+.chip:hover{border-color:#3A4A6C}
+.chip[aria-pressed="true"]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip .count{font-family:var(--mono);font-size:12px;opacity:.7}
+.chip svg{flex:none}
+.row-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.days button{min-height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
+.days button[aria-pressed="true"]{background:var(--panel-2);color:var(--text);border-color:#3A4A6C}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.field{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+.field input,.field select{background:transparent;border:0;outline:0;min-width:0}
+.field input{width:170px}
+.field select option{background:var(--panel)}
+
+/* Lista de picks */
+.board-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin:18px 0 12px}
+.board-head h2{font-family:var(--display);font-weight:800;font-size:34px;text-transform:uppercase}
+.board-head .sub{color:var(--muted);font-size:14px}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.pick{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:left;cursor:pointer;width:100%;transition:border-color .15s,transform .15s}
+.pick:hover{border-color:#3A4A6C;transform:translateY(-2px)}
+.pick .meta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.pick .meta .sport{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
+.pick .teams{display:flex;flex-direction:column;gap:2px;margin:10px 0 12px;font-weight:600;font-size:17px}
+.pick .teams span{display:flex;justify-content:space-between;gap:10px}
+.form{display:inline-flex;gap:3px}
+.form i{width:7px;height:7px;border-radius:2px;display:inline-block}
+.form .w{background:var(--good)}.form .d{background:#5B6782}.form .l{background:var(--bad)}
+.market{display:flex;flex-direction:column;gap:6px}
+.market .name{font-weight:700;font-size:15px}
+.bar{position:relative;height:8px;border-radius:4px;background:var(--panel-2);overflow:hidden}
+.bar > i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:4px}
+.bar .th{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);opacity:.55}
+.prob{text-align:right;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;min-width:96px}
+.prob .p{font-family:var(--display);font-weight:900;font-size:54px;line-height:.85}
+.prob .p small{font-size:26px}
+.prob .odds{font-size:13px;color:var(--muted);text-align:right}
+.prob .odds b{color:var(--text);font-family:var(--mono)}
+.pick .more{grid-column:1 / -1;display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:13px}
+.pick .more b{color:var(--accent)}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:40px 24px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+
+/* Bloques de información */
+.note{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;font-size:14px;color:var(--muted);margin-top:22px}
+.note b.tag{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.1em;border:1px solid var(--muted);border-radius:4px;padding:2px 6px;color:var(--text)}
+.note strong{color:var(--text)}
+
+/* Historial */
+.view{display:none}
+.view.on{display:block}
+.section-title{font-family:var(--display);font-weight:900;font-size:clamp(40px,6vw,72px);text-transform:uppercase;line-height:.92;margin:40px 0 10px}
+.section-lead{color:var(--muted);max-width:62ch;margin:0 0 24px;font-size:17px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.kpi .v{font-family:var(--display);font-weight:900;font-size:56px;line-height:.95}
+.kpi .k{color:var(--muted);font-size:14px}
+.kpi.warn .v{color:var(--bad)}
+.kpi.ok .v{color:var(--good)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}
+.card h3{font-size:18px;margin-bottom:4px}
+.card .cap{color:var(--muted);font-size:14px;margin:0 0 14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.tbl{overflow-x:auto}
+.res{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font-weight:700;font-size:13px}
+.res.ok{background:rgba(52,211,153,.16);color:var(--good)}
+.res.ko{background:rgba(248,113,113,.16);color:var(--bad)}
+svg text{font-family:var(--mono)}
+
+/* Método */
+.method{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.method .card h3{display:flex;align-items:center;gap:8px}
+.method .card p{color:var(--muted);font-size:15px;margin:6px 0 0}
+.steps{counter-reset:s;display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.steps li::before{content:counter(s);font-family:var(--display);font-weight:900;font-size:34px;line-height:1;color:var(--accent)}
+.steps li span{color:var(--muted);font-size:15px}
+.steps li b{color:var(--text)}
+
+/* Detalle del partido */
+.overlay{position:fixed;inset:0;background:rgba(4,7,14,.72);display:none;z-index:50;padding:20px;overflow-y:auto}
+.overlay.on{display:block}
+.dialog{max-width:860px;margin:4vh auto;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.d-head{padding:22px 24px;background:var(--panel-2);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.d-head h2{font-family:var(--display);font-weight:900;font-size:clamp(30px,5vw,46px);text-transform:uppercase;line-height:.95}
+.d-head .meta{color:var(--muted);font-size:14px;margin-top:8px}
+.close{width:44px;height:44px;flex:none;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;display:grid;place-items:center}
+.d-body{padding:22px 24px;display:grid;grid-template-columns:minmax(0,1fr);gap:22px}
+.d-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.d-facts > div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.d-facts .k{color:var(--muted);font-size:12px}
+.d-facts .v{font-family:var(--display);font-weight:800;font-size:28px;line-height:1.1}
+.mk-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) 64px 64px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.mk-row:last-child{border-bottom:0}
+.mk-row .pp{font-family:var(--mono);text-align:right}
+.mk-row .fo{font-family:var(--mono);text-align:right;color:var(--muted)}
+.mk-row.above .pp{color:var(--accent);font-weight:600}
+.mk-head{color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.dist-wrap{overflow-x:auto}
+
+footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
+.foot{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:28px;padding:40px 20px;max-width:1240px;margin:0 auto;font-size:14px;color:var(--muted)}
+.foot h4{color:var(--text);margin:0 0 10px;font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+.foot a{display:block;color:var(--muted);text-decoration:none;padding:3px 0}
+.foot a:hover{color:var(--text)}
+.copy{border-top:1px solid var(--line);padding:16px 20px;text-align:center;font-size:13px;color:var(--muted)}
+
+@media (max-width:720px){
+  .hero-grid{grid-template-columns:1fr}
+  .big-threshold{text-align:left}
+  .picks{grid-template-columns:1fr}
+  .mk-row{grid-template-columns:minmax(0,1fr) 56px 56px}
+  .mk-row .bar{display:none}
+  .field input{width:120px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.brand-name span{color:var(--text)}
+.brand-name{display:flex;align-items:baseline;gap:8px}
+.brand-name .sub{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--muted);font-weight:500}
+.updated{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:6px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:8px}
+.updated i{width:7px;height:7px;border-radius:50%;background:var(--good);display:inline-block}
+.updated.stale i{background:var(--bad)}
+.mock-strip{background:#1B2440;color:var(--text);font-size:13px;text-align:center;padding:8px 16px;border-bottom:1px solid var(--line)}
+.mock-strip b{color:var(--accent)}
+.logo{width:20px;height:20px;object-fit:contain;flex:none}
+.tn{display:inline-flex;align-items:center;gap:8px;min-width:0}
+.tn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loading{color:var(--muted);padding:40px 0;text-align:center}
+.res.void{background:rgba(154,166,188,.16);color:var(--muted)}
+.res.pend{background:rgba(255,90,54,.12);color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="legal-strip"><b>+18</b>Pronósticos con fines informativos. No garantizan resultados. Apuesta con responsabilidad.</div>
+<div class="mock-strip" id="mockStrip" hidden><b>Versión de demostración:</b> equipos y resultados simulados.</div>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#pronosticos" aria-label="Inicio">
+      <span class="brand-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#170A05" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M3 19h18"/><path d="M14 4v15"/><circle cx="6" cy="15" r="1.4" fill="#170A05" stroke="none"/><circle cx="9.5" cy="12" r="1.4" fill="#170A05" stroke="none"/><circle cx="18" cy="9" r="1.4" fill="#170A05" stroke="none"/></svg></span>
+      <span class="brand-name"><span data-brand-short>Umbral</span><span class="sub">ANALYTICS</span></span>
+    </a>
+    <nav class="views" aria-label="Secciones">
+      <a href="#pronosticos" data-view="pronosticos">Pronósticos</a>
+      <a href="#historial" data-view="historial">Historial</a>
+      <a href="#metodo" data-view="metodo">Cómo calculamos</a>
+    </nav>
+    <span class="updated" id="updated"><i></i><span>Cargando…</span></span>
+  </div>
+</header>
+
+<main>
+<section class="view" id="view-pronosticos" aria-label="Pronósticos">
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-grid">
+        <div>
+          <p class="mono" style="color:var(--muted);margin:0 0 14px">El umbral · <span id="heroDate"></span></p>
+          <h1>Solo publicamos lo que el modelo ve <em>por encima del umbral</em></h1>
+          <p class="lead">Cada punto de la regla es un mercado con su probabilidad calculada. Arrastra la línea: lo que queda a la derecha es lo que ves abajo.</p>
+        </div>
+        <div class="big-threshold">
+          <span class="val num" id="bigVal">70%</span>
+          <span class="mono lbl">Probabilidad mínima</span>
+        </div>
+      </div>
+      <div class="ruler-card">
+        <div class="ruler-head">
+          <strong id="rulerTitle">Todos los mercados del día</strong>
+          <span class="stat"><b class="num" id="statAbove">0</b> mercados superan el umbral, en <b class="num" id="statMatches">0</b> partidos de <b class="num" id="statTotal">0</b></span>
+        </div>
+        <div class="ruler">
+          <canvas id="ruler" aria-hidden="true"></canvas>
+          <input type="range" id="threshold" min="50" max="92" step="1" value="70" aria-label="Probabilidad mínima para mostrar un pronóstico">
+        </div>
+        <div class="ruler-scale mono"><span>50%</span><span>60%</span><span>70%</span><span>80%</span><span>90%</span></div>
+        <div class="ruler-hint">Gris: por debajo del umbral. Naranja: se publica. Con el teclado, usa las flechas sobre la regla.</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="sports" id="sports" role="group" aria-label="Deporte"></div>
+      <div class="row-filters">
+        <div class="days" id="days" role="group" aria-label="Día"></div>
+        <div class="tools">
+          <label class="field" for="q">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Buscar equipo</span>
+            <input id="q" type="search" placeholder="Buscar equipo o liga">
+          </label>
+          <label class="field" for="sort">
+            <span class="mono" style="color:var(--muted)">Orden</span>
+            <select id="sort">
+              <option value="time">Hora</option>
+              <option value="prob">Probabilidad</option>
+              <option value="odds">Mejor cuota justa</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="board-head">
+      <h2 id="boardTitle">Pronósticos</h2>
+      <span class="sub" id="boardSub"></span>
+    </div>
+    <div class="picks" id="picks"><div class="loading">Cargando pronósticos…</div></div>
+
+    <div class="note">
+      <b class="tag">CLAVE</b>
+      <div><strong>Cuota justa</strong> es la cuota que corresponde a la probabilidad del modelo (1 ÷ probabilidad). Un pronóstico solo tiene valor si la casa paga <strong>más</strong> que esa cifra. Acertar mucho con cuotas bajas no asegura ganar dinero.</div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="view-historial" aria-label="Historial">
+  <div class="wrap">
+    <h2 class="section-title">Historial</h2>
+    <p class="section-lead" id="histLead">Cada pronóstico publicado se guarda antes de que empiece el partido y se cierra solo con el resultado oficial. Se muestran todos, los acertados y los fallados.</p>
+    <div class="kpis" id="kpis"></div>
+    <div class="two">
+      <div class="card">
+        <h3>¿El modelo dice la verdad?</h3>
+        <p class="cap">Probabilidad prometida frente a lo que pasó, por tramos. Si los puntos caen sobre la diagonal, el modelo está bien calibrado.</p>
+        <div id="calib"></div>
+      </div>
+      <div class="card">
+        <h3>Por deporte</h3>
+        <p class="cap" id="roiCap">Aciertos y retorno estimado si se hubiera apostado 1 unidad a cuotas de mercado.</p>
+        <div class="tbl"><table id="bySport"></table></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>Últimos pronósticos</h3>
+      <p class="cap">Los 30 más recientes, incluidos los que aún no se juegan.</p>
+      <div class="tbl"><table id="recent"></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="view-metodo" aria-label="Cómo calculamos">
+  <div class="wrap">
+    <h2 class="section-title">Cómo calculamos</h2>
+    <p class="section-lead">Cada deporte tiene su propio modelo. Todos parten de lo mismo: medir el ataque y la defensa de cada equipo con sus partidos de la temporada, dando más peso a los recientes y ajustando por la fuerza de cada rival.</p>
+    <div class="method" id="method"></div>
+    <h2 class="section-title" style="font-size:clamp(32px,4.5vw,52px)">Del dato al pronóstico</h2>
+    <ol class="steps">
+      <li><span><b>Datos.</b> Calendario y resultados oficiales de cada liga, actualizados varias veces al día.</span></li>
+      <li><span><b>Fuerza.</b> Índice de ataque y defensa por equipo. Un partido de hace dos meses pesa la mitad que uno de esta semana.</span></li>
+      <li><span><b>Probabilidades.</b> El modelo de cada deporte convierte esos índices en la probabilidad de cada mercado.</span></li>
+      <li><span><b>Umbral.</b> Solo se publican los mercados que superan el umbral. De cada partido se muestra el de mejor cuota que aún lo supera.</span></li>
+      <li><span><b>Cierre.</b> El pronóstico queda guardado antes del inicio y se marca acertado o fallado con el resultado final. No se puede editar.</span></li>
+    </ol>
+    <div class="note"><b class="tag">+18</b><div><strong>Juego responsable.</strong> Una probabilidad de 70&nbsp;% significa que el resultado no ocurre 3 de cada 10 veces. Nuestros pronósticos son opiniones basadas en estadísticas. Apuesta solo lo que puedas permitirte perder y nunca intentes recuperar pérdidas.</div></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="brand-name" style="font-size:24px"><span data-brand-short>Umbral</span><span class="sub">ANALYTICS</span></div>
+      <p style="margin:10px 0 0">Probabilidades deportivas calculadas con modelos estadísticos y datos oficiales. Hecho en Perú.</p>
+    </div>
+    <div><h4>Secciones</h4><a href="#pronosticos">Pronósticos</a><a href="#historial">Historial</a><a href="#metodo">Cómo calculamos</a></div>
+    <div><h4>Legal</h4><a href="#metodo">Juego responsable</a><a href="privacidad.html">Política de privacidad</a><a href="terminos.html">Términos y condiciones</a></div>
+    <div><h4>Contacto</h4><span id="contact"></span></div>
+  </div>
+  <div class="copy">© <span id="year"></span> <span data-brand>Umbral Analytics</span> · Sitio para mayores de 18 años</div>
+</footer>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <div class="dialog">
+    <div class="d-head">
+      <div>
+        <div class="mono" id="dLeague" style="color:var(--accent)"></div>
+        <h2 id="dTitle"></h2>
+        <div class="meta" id="dMeta"></div>
+      </div>
+      <button class="close" id="dClose" aria-label="Cerrar detalle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="d-body">
+      <div class="d-facts" id="dFacts"></div>
+      <div>
+        <h3 style="font-size:18px;margin-bottom:4px">Todos los mercados</h3>
+        <p style="color:var(--muted);font-size:14px;margin:0 0 8px">La línea blanca marca el umbral. En naranja, los que se publicarían.</p>
+        <div class="mk-row mk-head"><span>Mercado</span><span></span><span style="text-align:right">Prob.</span><span style="text-align:right">Cuota justa</span></div>
+        <div id="dMarkets"></div>
+      </div>
+      <div>
+        <h3 style="font-size:18px;margin-bottom:4px" id="dDistTitle">Distribución de resultados</h3>
+        <p style="color:var(--muted);font-size:14px;margin:0 0 12px" id="dDistCap"></p>
+        <div class="dist-wrap" id="dDist"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var DATA_URL='data/pronosticos.json',HIST_URL='data/historial.json';
+
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function pct(p){return Math.round(p*100);}
+function fair(p){return (1/p).toFixed(2);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+var ICON={
+ futbol:'<circle cx="12" cy="12" r="9"/><path d="m12 7 4 3-1.5 4.5h-5L8 10z"/><path d="M12 3v4M21 10l-5 0M18 19l-3.5-4.5M6 19l3.5-4.5M3 10h5"/>',
+ basquet:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3.5 3.5 3.5 9.3 0 12.8M18.4 5.6c-3.5 3.5-3.5 9.3 0 12.8"/>',
+ beisbol:'<circle cx="12" cy="12" r="9"/><path d="M7 4.8c1.8 2 1.8 12.4 0 14.4M17 4.8c-1.8 2-1.8 12.4 0 14.4"/>',
+ nfl:'<ellipse cx="12" cy="12" rx="10" ry="6" transform="rotate(-45 12 12)"/><path d="m9 15 6-6M10.5 10.5l3 3M8.5 12.5l3 3M12.5 8.5l3 3"/>',
+ hockey:'<path d="M4 3l7 13a3 3 0 0 0 2.7 1.7H20"/><ellipse cx="16" cy="20" rx="4" ry="1.5"/>',
+ voley:'<circle cx="12" cy="12" r="9"/><path d="M12 3c0 5 3 8 8 9M12 12c-4 2-6 5-6 8M12 12c4 1.5 5.5 3.5 6 6.5M12 3c-3 2.5-5 5.5-8.5 6.5"/>',
+ balonmano:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3.5 9h17M3.5 15h17"/>',
+ rugby:'<ellipse cx="12" cy="12" rx="10" ry="6"/><path d="M12 6v12M8 12h8"/>'
+};
+function icon(k,size){return '<svg width="'+(size||16)+'" height="'+(size||16)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICON[k]||ICON.futbol)+'</svg>';}
+
+var DATA=null,HIST=[],SPORT_BY={},DAYS=[],TZ='America/Lima';
+var state={th:0.70,sport:'all',day:0,q:'',sort:'time'};
+try{var saved=JSON.parse(localStorage.getItem('umbral-state')||'null');if(saved){state.th=saved.th||0.7;state.sport=saved.sport||'all';state.sort=saved.sort||'time';}}catch(e){}
+function save(){try{localStorage.setItem('umbral-state',JSON.stringify({th:state.th,sport:state.sport,sort:state.sort}));}catch(e){}}
+
+function dayKey(ts){return new Date(ts*1000).toLocaleDateString('en-CA',{timeZone:TZ});}
+function timeStr(ts){return new Date(ts*1000).toLocaleTimeString('es-PE',{timeZone:TZ,hour:'numeric',minute:'2-digit'});}
+function dateStr(ts,opts){return new Date(ts*1000).toLocaleDateString('es-PE',Object.assign({timeZone:TZ},opts)).replace('.','');}
+function dayLabel(key){var today=dayKey(Date.now()/1000),tom=dayKey(Date.now()/1000+86400);if(key===today)return 'Hoy';if(key===tom)return 'Mañana';var p=key.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2],12)).toLocaleDateString('es-PE',{timeZone:'UTC',weekday:'short',day:'numeric'}).replace('.','');}
+
+function pickFor(m,th){var a=m.markets.filter(function(x){return x.p>=th;});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
+function dayMatches(){var k=DAYS[state.day];return DATA.matches.filter(function(m){return dayKey(m.ts)===k;});}
+
+/* ---------- regla ---------- */
+var canvas=document.getElementById('ruler'),ctx=canvas.getContext('2d');
+function drawRuler(){
+  if(!DATA)return;
+  var dpr=window.devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;if(!w)return;
+  canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  var min=0.5,max=0.92,pad=6,x=function(p){return pad+(p-min)/(max-min)*(w-2*pad);};
+  ctx.strokeStyle='rgba(154,166,188,.18)';ctx.lineWidth=1;
+  for(var g=0.5;g<=0.9001;g+=0.05){ctx.beginPath();ctx.moveTo(x(g),0);ctx.lineTo(x(g),h-8);ctx.stroke();}
+  var tx=x(state.th);ctx.fillStyle='rgba(255,90,54,.07)';ctx.fillRect(tx,0,w-tx,h-8);
+  var all=[];dayMatches().forEach(function(f){if(state.sport!=='all'&&f.sport!==state.sport)return;f.markets.forEach(function(m){if(m.p>=min&&m.p<=max)all.push(m.p);});});
+  all.sort();var cols={},r=3.2,step=r*2+1.4;
+  all.forEach(function(p){var cx=Math.round(x(p)/step)*step,n=cols[cx]||0;cols[cx]=n+1;var cy=h-14-n*step;if(cy<r)return;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fillStyle=p>=state.th?'#FF5A36':'rgba(154,166,188,.45)';ctx.fill();});
+  ctx.strokeStyle='#EEF2F8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(tx,0);ctx.lineTo(tx,h-4);ctx.stroke();
+  ctx.fillStyle='#EEF2F8';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(tx-17,2,34,20,5);else ctx.rect(tx-17,2,34,20);ctx.fill();
+  ctx.fillStyle='#090E1A';ctx.font='600 11px "IBM Plex Mono", monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(pct(state.th)+'%',tx,12.5);
+}
+
+/* ---------- picks ---------- */
+var elPicks=document.getElementById('picks');
+function formHTML(f){if(!f||!f.length)return '';return '<span class="form" aria-label="Últimos '+f.length+': '+f.map(function(x){return x==='w'?'ganó':x==='d'?'empató':'perdió';}).join(', ')+'">'+f.map(function(x){return '<i class="'+x+'"></i>';}).join('')+'</span>';}
+function logo(u){return u?'<img class="logo" src="'+esc(u)+'" alt="" loading="lazy" onerror="this.remove()">':'';}
+function renderPicks(){
+  var th=state.th,list=dayMatches(),q=state.q.trim().toLowerCase();
+  var counts={all:0};DATA.sports.forEach(function(s){counts[s.id]=0;});
+  var aboveMk=0,matchesWith=0,total=0,rows=[];
+  list.forEach(function(f){
+    var pk=pickFor(f,th);
+    if(state.sport==='all'||f.sport===state.sport){total++;f.markets.forEach(function(m){if(m.p>=th)aboveMk++;});if(pk)matchesWith++;}
+    if(pk){counts.all++;counts[f.sport]=(counts[f.sport]||0)+1;}
+    if(!pk)return;
+    if(state.sport!=='all'&&f.sport!==state.sport)return;
+    if(q&&(f.home+' '+f.away+' '+f.league).toLowerCase().indexOf(q)<0)return;
+    rows.push({f:f,pk:pk});
+  });
+  if(state.sort==='time')rows.sort(function(a,b){return a.f.ts-b.f.ts;});
+  if(state.sort==='prob')rows.sort(function(a,b){return b.pk.market.p-a.pk.market.p;});
+  if(state.sort==='odds')rows.sort(function(a,b){return a.pk.market.p-b.pk.market.p;});
+  document.getElementById('statAbove').textContent=aboveMk;
+  document.getElementById('statMatches').textContent=matchesWith;
+  document.getElementById('statTotal').textContent=total;
+  document.getElementById('bigVal').textContent=pct(th)+'%';
+  var dl=DAYS.length?dayLabel(DAYS[state.day]):'Hoy';
+  document.getElementById('rulerTitle').textContent='Todos los mercados · '+dl;
+  document.getElementById('boardTitle').textContent='Pronósticos · '+dl.toLowerCase();
+  document.getElementById('boardSub').textContent=rows.length+(rows.length===1?' partido':' partidos')+' con al menos un mercado sobre '+pct(th)+'%';
+  renderSports(counts);
+  if(!list.length){elPicks.innerHTML='<div class="empty"><strong>No hay partidos programados para este día</strong>Prueba con otro día o revisa más tarde.</div>';return;}
+  if(!rows.length){elPicks.innerHTML='<div class="empty"><strong>Ningún partido supera '+pct(th)+'% con estos filtros</strong>Baja el umbral en la regla, cambia de deporte o de día.</div>';return;}
+  elPicks.innerHTML=rows.map(function(r){var f=r.f,m=r.pk.market,sp=SPORT_BY[f.sport]||{name:f.sport};
+    return '<button class="pick" data-id="'+esc(f.id)+'" aria-label="Ver detalle de '+esc(f.home)+' contra '+esc(f.away)+'">'+
+      '<div style="min-width:0"><div class="meta"><span class="sport">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span><span>'+esc(f.league)+'</span><span>·</span><span class="num">'+timeStr(f.ts)+'</span></div>'+
+      '<div class="teams"><span><span class="tn">'+logo(f.logoH)+'<span>'+esc(f.home)+'</span></span>'+formHTML(f.formH)+'</span><span><span class="tn">'+logo(f.logoA)+'<span>'+esc(f.away)+'</span></span>'+formHTML(f.formA)+'</span></div>'+
+      '<div class="market"><span class="name">'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
+      '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+
+      '<div class="more"><span>'+(r.pk.count>1?'<b>'+(r.pk.count-1)+'</b> mercado'+(r.pk.count>2?'s':'')+' más sobre el umbral':'Único mercado sobre el umbral')+'</span><span>Ver análisis →</span></div>'+
+    '</button>';}).join('');
+}
+function renderSports(counts){
+  var items=[{id:'all',name:'Todos'}].concat(DATA.sports);
+  document.getElementById('sports').innerHTML=items.map(function(s){return '<button class="chip" data-sport="'+s.id+'" aria-pressed="'+(state.sport===s.id)+'">'+(s.id==='all'?'':icon(s.id,16))+esc(s.name)+' <span class="count num">'+(counts[s.id]||0)+'</span></button>';}).join('');
+}
+function renderDays(){
+  document.getElementById('days').innerHTML=DAYS.map(function(k,i){return '<button data-day="'+i+'" aria-pressed="'+(state.day===i)+'">'+dayLabel(k)+'</button>';}).join('');
+}
+
+/* ---------- detalle ---------- */
+var overlay=document.getElementById('overlay'),lastFocus=null;
+function openDetail(id){
+  var f=DATA.matches.filter(function(x){return x.id===id;})[0];if(!f)return;
+  var sp=SPORT_BY[f.sport]||{name:f.sport},th=state.th;
+  document.getElementById('dLeague').textContent=sp.name+' · '+f.league;
+  document.getElementById('dTitle').textContent=f.home+' vs '+f.away;
+  document.getElementById('dMeta').textContent=dayLabel(dayKey(f.ts))+' · '+timeStr(f.ts)+' (hora de Perú)';
+  var best=pickFor(f,th);
+  var facts=f.exp.map(function(e){return '<div><div class="k">'+esc(e[0])+'</div><div class="v num">'+esc(e[1])+'</div></div>';}).join('');
+  facts+='<div><div class="k">Pronóstico publicado</div><div class="v" style="font-size:20px;line-height:1.25;padding-top:4px">'+(best?esc(best.market.n)+' · '+pct(best.market.p)+'%':'Ninguno sobre '+pct(th)+'%')+'</div></div>';
+  document.getElementById('dFacts').innerHTML=facts;
+  var mk=f.markets.slice().sort(function(a,b){return b.p-a.p;});
+  document.getElementById('dMarkets').innerHTML=mk.map(function(m){return '<div class="mk-row'+(m.p>=th?' above':'')+'"><span>'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%;background:'+(m.p>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(m.p*100).toFixed(1)+'%</span><span class="fo">'+fair(m.p)+'</span></div>';}).join('');
+  renderDist(f.dist,f);
+  lastFocus=document.activeElement;overlay.classList.add('on');document.getElementById('dClose').focus();document.body.style.overflow='hidden';
+}
+function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
+function renderDist(d,f){
+  var el=document.getElementById('dDist'),t=document.getElementById('dDistTitle'),c=document.getElementById('dDistCap');
+  if(d.kind==='matrix'){
+    t.textContent='Marcadores más probables';
+    c.textContent='Filas: goles de '+f.home+'. Columnas: goles de '+f.away+'. Más intenso, más probable.';
+    var N=6,max=0,i,j;for(i=0;i<N;i++)for(j=0;j<N;j++)max=Math.max(max,d.mat[i][j]);
+    var cs=56,ox=44,oy=28,W=ox+N*cs,H=oy+N*cs,s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Mapa de calor de marcadores">';
+    for(j=0;j<N;j++)s+='<text x="'+(ox+j*cs+cs/2)+'" y="18" fill="#9AA6BC" font-size="12" text-anchor="middle">'+j+'</text>';
+    for(i=0;i<N;i++){s+='<text x="'+(ox-12)+'" y="'+(oy+i*cs+cs/2+4)+'" fill="#9AA6BC" font-size="12" text-anchor="end">'+i+'</text>';
+      for(j=0;j<N;j++){var p=d.mat[i][j],a=(0.06+0.94*p/max).toFixed(3);
+        s+='<rect x="'+(ox+j*cs+1)+'" y="'+(oy+i*cs+1)+'" width="'+(cs-2)+'" height="'+(cs-2)+'" rx="6" fill="rgba(255,90,54,'+a+')"/>';
+        s+='<text x="'+(ox+j*cs+cs/2)+'" y="'+(oy+i*cs+cs/2+4)+'" font-size="12" text-anchor="middle" fill="'+(p/max>0.55?'#170A05':'#EEF2F8')+'">'+(p*100).toFixed(p<0.01?1:0)+'%</text>';}}
+    el.innerHTML=s+'</svg>';return;
+  }
+  t.textContent=d.title;c.textContent=d.mark!=null?'La línea punteada marca la frontera del total principal.':'Probabilidad de cada resultado según el modelo.';
+  var data=d.data,maxp=Math.max.apply(null,data.map(function(x){return x.p;}));
+  var bw=Math.max(30,Math.min(56,Math.floor(760/data.length))),gap=6,H2=190,base=150,W2=data.length*(bw+gap)+10;
+  var s2='<svg width="'+W2+'" height="'+H2+'" viewBox="0 0 '+W2+' '+H2+'" role="img" aria-label="'+esc(d.title)+'"><line x1="0" y1="'+base+'" x2="'+W2+'" y2="'+base+'" stroke="#22304C"/>';
+  data.forEach(function(x,k){var bh=Math.max(1,(x.p/maxp)*(base-24)),bx=5+k*(bw+gap),hl=d.mark!=null&&+x.label>d.mark;
+    s2+='<rect x="'+bx+'" y="'+(base-bh)+'" width="'+bw+'" height="'+bh+'" rx="4" fill="'+(x.p===maxp?'#FF5A36':hl?'#5B6B8F':'#3A4868')+'"/>';
+    s2+='<text x="'+(bx+bw/2)+'" y="'+(base-bh-6)+'" font-size="10.5" text-anchor="middle" fill="#9AA6BC">'+(x.p*100<1?'':Math.round(x.p*100)+'%')+'</text>';
+    s2+='<text x="'+(bx+bw/2)+'" y="'+(base+16)+'" font-size="11" text-anchor="middle" fill="#EEF2F8">'+esc(x.label)+'</text>';});
+  if(d.mark!=null){var mx=5+(Math.floor(d.mark)+1)*(bw+gap)-gap/2;s2+='<line x1="'+mx+'" y1="10" x2="'+mx+'" y2="'+base+'" stroke="#EEF2F8" stroke-dasharray="3 3" opacity=".7"/>';}
+  el.innerHTML=s2+'</svg>';
+}
+
+/* ---------- historial ---------- */
+function buildHistory(){
+  var margin=DATA.margin||0.06,closed=HIST.filter(function(h){return h.status==='ok'||h.status==='ko';}),pend=HIST.filter(function(h){return h.status==='pending';}).length;
+  document.getElementById('roiCap').textContent='Aciertos y retorno estimado si se hubiera apostado 1 unidad a cuotas de mercado (cuota justa menos '+Math.round(margin*100)+' % de margen de la casa).';
+  if(!closed.length){
+    document.getElementById('kpis').innerHTML='<div class="kpi"><div class="v num">'+pend+'</div><div class="k">Pronósticos esperando resultado</div></div>';
+    document.getElementById('calib').innerHTML='<p class="cap">Aparecerá cuando se cierren los primeros pronósticos.</p>';
+    document.getElementById('bySport').innerHTML='';
+  } else {
+    var n=closed.length,hits=closed.filter(function(r){return r.status==='ok';}).length,avgP=closed.reduce(function(t,r){return t+r.p;},0)/n;
+    var roiOf=function(rs){return rs.reduce(function(t,r){return t+(r.status==='ok'?(1/r.p)*(1-margin)-1:-1);},0)/rs.length;},roi=roiOf(closed);
+    var first=closed.reduce(function(a,r){return Math.min(a,r.ts);},Infinity);
+    document.getElementById('histLead').textContent='Cada pronóstico se guarda antes de que empiece el partido y se cierra solo con el resultado oficial. '+n+' cerrados desde el '+dateStr(first,{day:'numeric',month:'long'})+', más '+pend+' esperando resultado.';
+    document.getElementById('kpis').innerHTML=
+      '<div class="kpi ok"><div class="v num">'+(hits/n*100).toFixed(1)+'%</div><div class="k">Aciertos en '+n+' pronósticos</div></div>'+
+      '<div class="kpi"><div class="v num">'+(avgP*100).toFixed(1)+'%</div><div class="k">Probabilidad media que prometía el modelo</div></div>'+
+      '<div class="kpi '+(roi<0?'warn':'ok')+'"><div class="v num">'+(roi>0?'+':'')+(roi*100).toFixed(1)+'%</div><div class="k">Retorno estimado a cuotas de mercado</div></div>'+
+      '<div class="kpi"><div class="v num">'+pend+'</div><div class="k">Pronósticos esperando resultado</div></div>';
+    var buckets=[[0.70,0.75],[0.75,0.80],[0.80,0.85],[0.85,0.90],[0.90,1.01]],pts=buckets.map(function(b){var rs=closed.filter(function(r){return r.p>=b[0]&&r.p<b[1];});return {pred:rs.length?rs.reduce(function(t,r){return t+r.p;},0)/rs.length:null,real:rs.length?rs.filter(function(r){return r.status==='ok';}).length/rs.length:null,n:rs.length,label:pct(b[0])+'–'+(b[1]>1?'100':pct(b[1]))};});
+    var W=420,H=300,L=46,B=36,T=12,R=12,lo=0.5,hi=1.0,X=function(v){return L+(v-lo)/(hi-lo)*(W-L-R);},Y=function(v){return H-B-(v-lo)/(hi-lo)*(H-B-T);};
+    var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Gráfico de calibración">';
+    [0.5,0.6,0.7,0.8,0.9,1.0].forEach(function(v){s+='<line x1="'+L+'" y1="'+Y(v)+'" x2="'+(W-R)+'" y2="'+Y(v)+'" stroke="#22304C"/><text x="'+(L-8)+'" y="'+(Y(v)+4)+'" font-size="11" text-anchor="end" fill="#9AA6BC">'+pct(v)+'%</text><text x="'+X(v)+'" y="'+(H-B+18)+'" font-size="11" text-anchor="middle" fill="#9AA6BC">'+pct(v)+'%</text>';});
+    s+='<line x1="'+X(lo)+'" y1="'+Y(lo)+'" x2="'+X(hi)+'" y2="'+Y(hi)+'" stroke="#9AA6BC" stroke-dasharray="4 4"/>';
+    s+='<text x="'+(W-R)+'" y="'+(H-4)+'" font-size="11" text-anchor="end" fill="#9AA6BC">Probabilidad prometida</text>';
+    var path='';pts.forEach(function(p){if(p.pred==null)return;path+=(path?'L':'M')+X(p.pred)+' '+Y(clamp(p.real,lo,hi));});
+    s+='<path d="'+path+'" fill="none" stroke="#FF5A36" stroke-width="2"/>';
+    pts.forEach(function(p){if(p.pred==null)return;var r=Math.max(4,Math.min(11,Math.sqrt(p.n)*1.2));s+='<circle cx="'+X(p.pred)+'" cy="'+Y(clamp(p.real,lo,hi))+'" r="'+r+'" fill="#FF5A36" stroke="#090E1A" stroke-width="2"><title>'+p.label+'%: '+p.n+' pronósticos, '+(p.real*100).toFixed(0)+'% acertados</title></circle>';});
+    document.getElementById('calib').innerHTML=s+'</svg>';
+    var t='<thead><tr><th>Deporte</th><th style="text-align:right">Picks</th><th style="text-align:right">Aciertos</th><th style="text-align:right">Retorno</th></tr></thead><tbody>';
+    DATA.sports.forEach(function(sp){var rs=closed.filter(function(r){return r.sport===sp.id;});if(!rs.length)return;var h=rs.filter(function(r){return r.status==='ok';}).length,ro=roiOf(rs);
+      t+='<tr><td><span style="display:inline-flex;gap:8px;align-items:center">'+icon(sp.id,15)+esc(sp.name)+'</span></td><td style="text-align:right">'+rs.length+'</td><td style="text-align:right">'+(h/rs.length*100).toFixed(0)+'%</td><td style="text-align:right;color:'+(ro<0?'var(--bad)':'var(--good)')+'">'+(ro>0?'+':'')+(ro*100).toFixed(1)+'%</td></tr>';});
+    document.getElementById('bySport').innerHTML=t+'</tbody>';
+  }
+  var rec=HIST.slice().sort(function(a,b){return b.ts-a.ts;}).slice(0,30);
+  var u='<thead><tr><th>Fecha</th><th>Partido</th><th>Pronóstico</th><th style="text-align:right">Prob.</th><th style="text-align:right">Cuota justa</th><th style="text-align:center">Marcador</th><th style="text-align:center">Resultado</th></tr></thead><tbody>';
+  var lab={ok:['ok','✓','Acertado'],ko:['ko','✗','Fallado'],void:['void','–','Anulado'],pending:['pend','•','Pendiente']};
+  rec.forEach(function(r){var L2=lab[r.status]||lab.pending;
+    u+='<tr><td>'+dateStr(r.ts,{day:'numeric',month:'short'})+'</td><td><span style="display:inline-flex;gap:8px;align-items:center">'+icon(r.sport,14)+esc(r.home)+' vs '+esc(r.away)+'</span></td><td>'+esc(r.n)+'</td><td style="text-align:right">'+pct(r.p)+'%</td><td style="text-align:right">'+fair(r.p)+'</td><td style="text-align:center">'+(r.score?esc(r.score):'—')+'</td><td style="text-align:center"><span class="res '+L2[0]+'" title="'+L2[2]+'" aria-label="'+L2[2]+'">'+L2[1]+'</span></td></tr>';});
+  document.getElementById('recent').innerHTML=u+'</tbody>';
+}
+
+/* ---------- método ---------- */
+var METHOD={
+ futbol:['Fútbol','Modelo de Poisson con ataque y defensa de cada equipo y ventaja de local. Da la probabilidad de cada marcador y de ahí 1X2, doble oportunidad, totales y ambos marcan.'],
+ basquet:['Básquet','Puntos esperados de cada equipo y distribución normal sobre la diferencia. Ganador, hándicaps y totales.'],
+ beisbol:['Béisbol','Poisson de carreras con la fuerza ofensiva y defensiva de cada equipo. Ganador con extra innings, +1.5 y totales.'],
+ nfl:['Fútbol americano','Puntos esperados y distribución normal con la variación típica de la liga: ganador, hándicap y total.'],
+ hockey:['Hockey','Poisson de goles con prórroga repartida según la fuerza de cada equipo. Ganador, +1.5 y totales.'],
+ voley:['Vóley','Probabilidad de ganar cada set según sets ganados y cedidos, al mejor de cinco. Ganador, sets totales y hándicap.'],
+ balonmano:['Balonmano','Goles esperados y distribución normal sobre la diferencia. Ganador, hándicap y total.'],
+ rugby:['Rugby','Puntos esperados y distribución normal con la variación típica del rugby. Ganador, hándicap y total.']
+};
+function renderMethod(){document.getElementById('method').innerHTML=DATA.sports.map(function(s){var m=METHOD[s.id]||[s.name,''];return '<div class="card"><h3>'+icon(s.id,18)+esc(m[0])+'</h3><p>'+esc(m[1])+'</p></div>';}).join('');}
+
+/* ---------- vistas ---------- */
+var VIEWS=['pronosticos','historial','metodo'];
+function route(){
+  var v=(location.hash||'').replace('#','');if(VIEWS.indexOf(v)<0)v='pronosticos';
+  VIEWS.forEach(function(x){document.getElementById('view-'+x).classList.toggle('on',x===v);});
+  document.querySelectorAll('nav.views a').forEach(function(a){if(a.dataset.view===v)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+  if(v==='pronosticos')requestAnimationFrame(drawRuler);
+}
+
+/* ---------- carga ---------- */
+function showError(msg){elPicks.innerHTML='<div class="empty"><strong>No se pudieron cargar los pronósticos</strong>'+esc(msg)+'</div>';var u=document.getElementById('updated');u.classList.add('stale');u.lastChild.textContent='Sin datos';}
+function boot(){
+  TZ=DATA.timezone||TZ;
+  // Modo prueba: mueve las fechas para que la demo siempre muestre partidos desde hoy
+  if(DATA.mock){var sh=Math.round((Date.parse(dayKey(Date.now()/1000))-Date.parse(dayKey(DATA.updated)))/86400000)*86400;
+    if(sh>0){DATA.updated+=sh;DATA.matches.forEach(function(m){m.ts+=sh;});HIST.forEach(function(h){h.ts+=sh;});}}
+  DATA.sports.forEach(function(s){SPORT_BY[s.id]=s;});
+  if(state.sport!=='all'&&!SPORT_BY[state.sport])state.sport='all';
+  document.title=DATA.brand||document.title;
+  document.querySelectorAll('[data-brand]').forEach(function(e){e.textContent=DATA.brand;});
+  document.querySelectorAll('[data-brand-short]').forEach(function(e){e.textContent=DATA.brand_short||DATA.brand;});
+  document.getElementById('contact').textContent=DATA.contact||'';
+  document.getElementById('mockStrip').hidden=!DATA.mock;
+  var mins=Math.round((Date.now()/1000-DATA.updated)/60),u=document.getElementById('updated');
+  u.lastChild.textContent='Actualizado '+(mins<1?'ahora':mins<60?'hace '+mins+' min':'a las '+timeStr(DATA.updated));
+  if(mins>360)u.classList.add('stale');
+  var today=dayKey(Date.now()/1000),keys={};DATA.matches.forEach(function(m){var k=dayKey(m.ts);if(k>=today)keys[k]=1;});
+  DAYS=Object.keys(keys).sort().slice(0,4);if(!DAYS.length)DAYS=[today];
+  document.getElementById('heroDate').textContent=new Date().toLocaleDateString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
+  renderDays();renderMethod();renderPicks();buildHistory();route();
+}
+document.getElementById('year').textContent=new Date().getFullYear();
+Promise.all([
+  fetch(DATA_URL+'?v='+Date.now()).then(function(r){if(!r.ok)throw new Error('Falta data/pronosticos.json. Ejecuta update.php al menos una vez.');return r.json();}),
+  fetch(HIST_URL+'?v='+Date.now()).then(function(r){return r.ok?r.json():[];}).catch(function(){return [];})
+]).then(function(res){DATA=res[0];HIST=res[1]||[];boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
+
+/* ---------- eventos ---------- */
+var slider=document.getElementById('threshold');slider.value=Math.round(state.th*100);
+slider.addEventListener('input',function(){state.th=+slider.value/100;if(!DATA)return;drawRuler();renderPicks();save();});
+document.getElementById('sports').addEventListener('click',function(e){var b=e.target.closest('[data-sport]');if(!b)return;state.sport=b.dataset.sport;drawRuler();renderPicks();save();});
+document.getElementById('days').addEventListener('click',function(e){var b=e.target.closest('[data-day]');if(!b)return;state.day=+b.dataset.day;renderDays();drawRuler();renderPicks();});
+document.getElementById('q').addEventListener('input',function(e){state.q=e.target.value;if(DATA)renderPicks();});
+var sortSel=document.getElementById('sort');sortSel.value=state.sort;
+sortSel.addEventListener('change',function(e){state.sort=e.target.value;if(DATA)renderPicks();save();});
+elPicks.addEventListener('click',function(e){var b=e.target.closest('.pick');if(b)openDetail(b.dataset.id);});
+document.getElementById('dClose').addEventListener('click',closeDetail);
+overlay.addEventListener('click',function(e){if(e.target===overlay)closeDetail();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&overlay.classList.contains('on'))closeDetail();});
+window.addEventListener('resize',drawRuler);
+window.addEventListener('hashchange',route);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawRuler);
+})();
+</script>
+</body>
+</html>
