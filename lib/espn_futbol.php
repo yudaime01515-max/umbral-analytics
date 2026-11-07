@@ -17,26 +17,12 @@ function espn_soccer_base(string $slug): string
     return "$b/$slug";
 }
 
-/** Calendario de la temporada (desde julio) de una liga. */
-function espn_soccer_events(string $slug, int $now): ?array
+/** Partidos de un día (formato ESPN: AAAAMMDD). */
+function espn_soccer_day(string $slug, string $ymd): ?array
 {
-    $y = (int)gmdate('Y', $now);
-    $season = ((int)gmdate('n', $now) >= 7) ? $y : $y - 1;
-    $from = gmmktime(12, 0, 0, 7, 1, $season);
-    $all = [];
-    for ($d = $from; $d <= $now; $d += 21 * 86400) {
-        $e = min($now, $d + 20 * 86400);
-        $range = gmdate('Ymd', $d) . '-' . gmdate('Ymd', $e);
-        $j = espn_fetch(espn_soccer_base($slug) . "/scoreboard?dates=$range&limit=500");
-        if ($j === null) {
-            usleep(400000);
-            $j = espn_fetch(espn_soccer_base($slug) . "/scoreboard?dates=$range");
-        }
-        if ($j === null) return null;
-        foreach ($j['events'] ?? [] as $ev) $all[(string)$ev['id']] = $ev;
-        usleep(250000);
-    }
-    return array_values($all);
+    $j = espn_fetch(espn_soccer_base($slug) . "/scoreboard?dates=$ymd");
+    if ($j === null) { usleep(500000); $j = espn_fetch(espn_soccer_base($slug) . "/scoreboard?dates=$ymd"); }
+    return $j === null ? null : ($j['events'] ?? []);
 }
 
 /** Valor de una estadística de la lista de ESPN [{name, value}, ...]. */
@@ -52,7 +38,7 @@ function espn_stat(array $stats, array $names): int
  * Actualiza los archivos de jugadores de todas las ligas.
  * Devuelve [codigo => [espnTeamId => nombre]] para enlazar equipos con los partidos.
  */
-function futbol_players_update(array $cfg, array $codes, string $dataDir): array
+function futbol_players_update(array $cfg, array $codes, string $dataDir, array $matchTs = []): array
 {
     $now = (int)($GLOBALS['UMBRAL_NOW'] ?? time());
     $dir = "$dataDir/fut";
@@ -71,36 +57,59 @@ function futbol_players_update(array $cfg, array $codes, string $dataDir): array
         $db = is_file($path) ? (json_decode(file_get_contents($path), true) ?: []) : [];
         $y = (int)gmdate('Y', $now);
         $season = ((int)gmdate('n', $now) >= 7) ? $y : $y - 1;
-        if (($db['season'] ?? null) !== $season) $db = ['season' => $season, 'teams' => [], 'players' => [], 'done' => []];
+        if (($db['season'] ?? null) !== $season) $db = ['season' => $season, 'teams' => [], 'players' => [], 'done' => [], 'queue' => [], 'days' => []];
         $done = array_flip(array_map('strval', $db['done'] ?? []));
 
-        $events = espn_soccer_events($slug, $now);
-        if ($events === null) {
-            log_line("ERROR jugadores $code (ESPN): " . ($GLOBALS['ESPN_LAST'] ?? 'sin respuesta'));
-            $teamsOut[$code] = array_map(fn($t) => $t['n'], $db['teams']);
-            continue;
+        // Días con partidos terminados (según football-data) que aún no se revisaron en ESPN.
+        // ESPN agrupa por fecha de EE. UU., así que se pide la fecha en UTC y la de 5 horas antes.
+        $daysDone = array_flip($db['days'] ?? []);
+        $queue = $db['queue'] ?? [];
+        $inQueue = array_flip(array_column($queue, 'id'));
+        $days = [];
+        foreach ($matchTs[$code] ?? [] as $ts) {
+            if ($ts > $now - 3 * 3600) continue;
+            $days[gmdate('Ymd', $ts)] = 1;
+            $days[gmdate('Ymd', $ts - 5 * 3600)] = 1;
         }
-
-        $pending = [];
-        foreach ($events as $ev) {
-            $c = $ev['competitions'][0] ?? [];
-            foreach ($c['competitors'] ?? [] as $t) {
-                $id = (string)($t['team']['id'] ?? $t['id'] ?? '');
-                if ($id === '') continue;
-                $db['teams'][$id] = [
-                    'n' => $t['team']['displayName'] ?? $t['team']['name'] ?? '?',
-                    'ab' => $t['team']['abbreviation'] ?? '',
-                    'logo' => $t['team']['logo'] ?? ($db['teams'][$id]['logo'] ?? ''),
-                ];
-            }
-            $st = $c['status']['type'] ?? $ev['status']['type'] ?? [];
-            if (!empty($st['completed']) && ($st['state'] ?? '') === 'post' && !isset($done[(string)$ev['id']])) {
+        $days = array_keys(array_diff_key($days, $daysDone));
+        sort($days);
+        $dayErr = 0; $daysRead = 0;
+        foreach ($days as $ymd) {
+            if ($dayErr >= 3) break;
+            $events = espn_soccer_day($slug, (string)$ymd);
+            usleep(200000);
+            if ($events === null) { $dayErr++; continue; }
+            $daysRead++;
+            $allDone = true;
+            foreach ($events as $ev) {
+                $c = $ev['competitions'][0] ?? [];
+                foreach ($c['competitors'] ?? [] as $t) {
+                    $id = (string)($t['team']['id'] ?? $t['id'] ?? '');
+                    if ($id === '') continue;
+                    $db['teams'][$id] = [
+                        'n' => $t['team']['displayName'] ?? $t['team']['name'] ?? '?',
+                        'ab' => $t['team']['abbreviation'] ?? '',
+                        'logo' => $t['team']['logo'] ?? ($db['teams'][$id]['logo'] ?? ''),
+                    ];
+                }
+                $st = $c['status']['type'] ?? $ev['status']['type'] ?? [];
+                $fin = !empty($st['completed']) && ($st['state'] ?? '') === 'post';
+                if (!$fin) { if (($st['state'] ?? 'pre') !== 'post') $allDone = false; continue; }
+                $eid = (string)$ev['id'];
+                if (isset($done[$eid]) || isset($inQueue[$eid])) continue;
                 $home = $away = null;
                 foreach ($c['competitors'] ?? [] as $t) { if (($t['homeAway'] ?? '') === 'home') $home = $t; else $away = $t; }
-                if ($home && $away) $pending[] = ['id' => (string)$ev['id'], 'ts' => (int)strtotime($ev['date'] ?? ''),
+                if (!$home || !$away) continue;
+                $queue[] = ['id' => $eid, 'ts' => (int)strtotime($ev['date'] ?? ''),
                     'h' => (string)($home['team']['id'] ?? $home['id']), 'a' => (string)($away['team']['id'] ?? $away['id'])];
+                $inQueue[$eid] = 1;
             }
+            if ($allDone) $daysDone[$ymd] = 1;
         }
+        if ($dayErr && !$daysRead) {
+            log_line("ERROR jugadores $code (ESPN): " . ($GLOBALS['ESPN_LAST'] ?? 'sin respuesta'));
+        }
+        $pending = $queue;
         usort($pending, fn($a, $b) => $a['ts'] <=> $b['ts']);
 
         $ok = 0; $fail = 0;
@@ -149,12 +158,14 @@ function futbol_players_update(array $cfg, array $codes, string $dataDir): array
         }
         foreach ($db['players'] as &$p) usort($p['h'], fn($a, $b) => $a[0] <=> $b[0]);
         unset($p);
+        $db['queue'] = array_values(array_filter($queue, fn($q) => !isset($done[$q['id']])));
+        $db['days'] = array_map('strval', array_keys($daysDone));
         $db['done'] = array_keys($done);
         $db['updated'] = $now;
         $db['league'] = $code;
         file_put_contents("$path.tmp", json_encode($db, JSON_UNESCAPED_UNICODE));
         rename("$path.tmp", $path);
-        $left = max(0, count($pending) - $ok - $fail);
+        $left = count($db['queue']);
         $logs[] = "$code $ok" . ($left ? " (faltan $left)" : '');
         $teamsOut[$code] = array_map(fn($t) => $t['n'], $db['teams']);
     }

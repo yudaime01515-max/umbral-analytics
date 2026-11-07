@@ -41,6 +41,7 @@ foreach ($history as $i => $h) $histIdx[$h['id']] = $i;
 
 $matches = [];
 $futCodes = [];
+$futTs = [];
 $sportsOut = [];
 $finalScores = [];
 
@@ -53,9 +54,11 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         $raw = api_get($cfg, $sportKey, $sport, $league);
         if (($sport['source'] ?? '') === 'espn' && !empty($sport['players'])) $nbaEvents = $raw;
         if (($sport['source'] ?? '') === 'footballdata' && !empty($sport['players']) && !empty($league['code'])) $futCodes[] = $league['code'];
+        $futRaw = (($sport['source'] ?? '') === 'footballdata' && !empty($league['code'])) ? $league['code'] : null;
         $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name'], $sport['source'] ?? 'apisports'), $raw)));
 
         $finished = array_values(array_filter($games, fn($g) => in_array($g['status'], FINISHED, true) && $g['hs'] !== null && $g['ts'] < $now));
+        if ($futRaw) $futTs[$futRaw] = array_column($finished, 'ts');
         foreach ($games as $g) {
             if (in_array($g['status'], FINISHED, true) && $g['hs'] !== null) $finalScores[$g['id']] = ['hs' => $g['hs'], 'as' => $g['as'], 'status' => 'final'];
             elseif (in_array($g['status'], VOID_STATUS, true)) $finalScores[$g['id']] = ['status' => 'void'];
@@ -102,7 +105,7 @@ if (!empty($nbaEvents)) {
 // Estadísticas de jugadores de fútbol (ESPN) y enlace de cada partido con sus equipos
 if (!empty($futCodes)) {
     try {
-        $futTeams = futbol_players_update($cfg, array_unique($futCodes), $dataDir);
+        $futTeams = futbol_players_update($cfg, array_unique($futCodes), $dataDir, $futTs);
         foreach ($matches as &$m) {
             if ($m['sport'] !== 'futbol' || empty($futTeams[$m['lgc']])) continue;
             $eh = club_match($m['hf'] ?: $m['home'], $futTeams[$m['lgc']]);
