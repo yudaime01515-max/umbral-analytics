@@ -389,7 +389,14 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 <script>
 (function(){
 'use strict';
-var DATA_URL='data/pronosticos.json',HIST_URL='data/historial.json';
+// Los datos se leen directo de GitHub para no gastar publicaciones en Netlify.
+// Si el repositorio cambia de dueño o nombre, cambia esta línea. Déjala vacía ('') para usar solo la carpeta data/.
+var REMOTE_DATA='https://raw.githubusercontent.com/yudaime01515-max/umbral-analytics/main/public/data/';
+function loadJSON(name,optional){
+  var local=function(){return fetch('data/'+name+'?v='+Date.now()).then(function(r){if(!r.ok){if(optional)return [];throw new Error('Falta data/'+name+'. Ejecuta update.php al menos una vez.');}return r.json();});};
+  if(!REMOTE_DATA)return local();
+  return fetch(REMOTE_DATA+name+'?v='+Date.now()).then(function(r){if(!r.ok)throw 0;return r.json();}).catch(local);
+}
 
 function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
 function pct(p){return Math.round(p*100);}
@@ -618,8 +625,8 @@ function boot(){
 }
 document.getElementById('year').textContent=new Date().getFullYear();
 Promise.all([
-  fetch(DATA_URL+'?v='+Date.now()).then(function(r){if(!r.ok)throw new Error('Falta data/pronosticos.json. Ejecuta update.php al menos una vez.');return r.json();}),
-  fetch(HIST_URL+'?v='+Date.now()).then(function(r){return r.ok?r.json():[];}).catch(function(){return [];})
+  loadJSON('pronosticos.json',false),
+  loadJSON('historial.json',true).catch(function(){return [];})
 ]).then(function(res){DATA=res[0];HIST=res[1]||[];boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
 
 /* ---------- eventos ---------- */
