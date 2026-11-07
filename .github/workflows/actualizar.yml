@@ -33,6 +33,6 @@ jobs:
         run: |
           git config user.name "umbral-bot"
           git config user.email "umbral-bot@users.noreply.github.com"
-          git add public/data/pronosticos.json public/data/historial.json
+          git add public/data
           git commit -m "Actualizar pronósticos" || echo "Sin cambios"
           git push
