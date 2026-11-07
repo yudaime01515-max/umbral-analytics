@@ -33,6 +33,12 @@ jobs:
         run: |
           git config user.name "umbral-bot"
           git config user.email "umbral-bot@users.noreply.github.com"
-          git add public/data
-          git commit -m "Actualizar pronósticos" || echo "Sin cambios"
-          git push
+          for i in 1 2 3; do
+            git fetch -q origin main
+            git reset -q origin/main
+            git add public/data
+            git commit -q -m "Actualizar pronósticos" || { echo "Sin cambios"; exit 0; }
+            git push -q origin HEAD:main && exit 0
+            echo "Otro guardado se cruzó, reintento $i"; sleep 5
+          done
+          exit 1
