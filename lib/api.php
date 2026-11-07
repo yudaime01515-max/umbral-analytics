@@ -182,6 +182,7 @@ function normalize(string $sportKey, array $g, string $leagueName, string $sourc
             'league' => $leagueName,
             'home' => $g['homeTeam']['shortName'] ?? $g['homeTeam']['name'] ?? '?',
             'away' => $g['awayTeam']['shortName'] ?? $g['awayTeam']['name'] ?? '?',
+            'home_full' => $g['homeTeam']['name'] ?? '', 'away_full' => $g['awayTeam']['name'] ?? '',
             'home_id' => $g['homeTeam']['id'] ?? 0, 'away_id' => $g['awayTeam']['id'] ?? 0,
             'logo_home' => $g['homeTeam']['crest'] ?? '', 'logo_away' => $g['awayTeam']['crest'] ?? '',
             'hs' => $hs === null ? null : (int)$hs, 'as' => $as === null ? null : (int)$as,

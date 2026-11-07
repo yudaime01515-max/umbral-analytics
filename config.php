@@ -55,6 +55,7 @@ return [
             'name' => 'Fútbol', 'host' => 'https://v3.football.api-sports.io', 'endpoint' => 'fixtures',
             'model' => 'poisson_draw',
             // Con clave de football-data.org el fútbol sale de ahí (gratis); si no, de API-Sports
+            'players' => true, // estadísticas de jugadores (ESPN, solo con football-data)
             'source' => $fdKey ? 'footballdata' : 'apisports',
             'leagues' => $fdKey ? [
                 ['code' => 'PL',  'name' => 'Premier League',   'on' => true],
