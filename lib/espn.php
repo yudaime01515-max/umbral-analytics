@@ -8,23 +8,60 @@
 
 function espn_base(): string
 {
-    return getenv('ESPN_BASE') ?: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba';
+    return $GLOBALS['ESPN_HOST'] ?? (getenv('ESPN_BASE') ?: 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba');
 }
 
-function espn_fetch(string $url): ?array
+function espn_fetch(string $url, ?int &$code = null): ?array
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTPHEADER => ['Accept: application/json'],
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; UmbralAnalytics/1.0)',
+        CURLOPT_ENCODING => '',
+        CURLOPT_HTTPHEADER => ['Accept: application/json, text/plain, */*', 'Accept-Language: en-US,en;q=0.9', 'Referer: https://www.espn.com/', 'Origin: https://www.espn.com'],
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36',
     ]);
     $body = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
     curl_close($ch);
-    if ($body === false || $code !== 200) return null;
+    if ($body === false || $code !== 200) {
+        $GLOBALS['ESPN_LAST'] = "HTTP $code" . ($err ? " $err" : '') . ($body ? ' ' . substr(preg_replace('/\s+/', ' ', strip_tags($body)), 0, 120) : '');
+        return null;
+    }
     $j = json_decode($body, true);
-    return is_array($j) ? $j : null;
+    if (!is_array($j)) { $GLOBALS['ESPN_LAST'] = 'respuesta no es JSON'; return null; }
+    return $j;
+}
+
+/** Calendario de un rango de fechas. Prueba varias formas por si ESPN rechaza alguna. */
+function espn_scoreboard(int $from, int $to): ?array
+{
+    $hosts = array_filter([getenv('ESPN_BASE') ?: null,
+        'https://site.api.espn.com/apis/site/v2/sports/basketball/nba',
+        'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba']);
+    $range = gmdate('Ymd', $from) . '-' . gmdate('Ymd', $to);
+    foreach (array_unique($hosts) as $h) {
+        foreach (["dates=$range&limit=500", "dates=$range"] as $q) {
+            $j = espn_fetch("$h/scoreboard?$q");
+            if ($j !== null && isset($j['events'])) { $GLOBALS['ESPN_HOST'] = $h; return $j['events']; }
+            usleep(300000);
+        }
+    }
+    // Último recurso: día por día
+    $h = $GLOBALS['ESPN_HOST'] ?? reset($hosts);
+    $all = [];
+    for ($d = $from; $d <= $to; $d += 86400) {
+        $j = espn_fetch("$h/scoreboard?dates=" . gmdate('Ymd', $d));
+        if ($j === null) {
+            $alt = 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba';
+            $j = espn_fetch("$alt/scoreboard?dates=" . gmdate('Ymd', $d));
+            if ($j === null) return null;
+            $GLOBALS['ESPN_HOST'] = $h = $alt;
+        }
+        foreach ($j['events'] ?? [] as $e) $all[] = $e;
+        usleep(250000);
+    }
+    return $all;
 }
 
 /** Año de inicio de la temporada en curso (la 2026-27 es 2026). */
@@ -47,19 +84,18 @@ function espn_nba_events(array $cfg, array $league): array
     $old = fn() => is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true) ?: []) : [];
     if (is_file($cachePath) && filemtime($cachePath) > time() - $cfg['cache_minutes'] * 60) return $memo = $old();
 
-    $from = gmmktime(12, 0, 0, 10, 1, $season);
+    $from = gmmktime(12, 0, 0, 10, 15, $season); // la temporada regular empieza a fines de octubre
     $to = $now + (($cfg['days_ahead'] ?? 3) + 2) * 86400;
     $all = []; $chunks = 0;
     for ($d = $from; $d <= $to; $d += 14 * 86400) {
         $e = min($to, $d + 13 * 86400);
-        $url = espn_base() . '/scoreboard?dates=' . gmdate('Ymd', $d) . '-' . gmdate('Ymd', $e) . '&limit=1000';
-        $j = espn_fetch($url);
-        if ($j === null) {
+        $events = espn_scoreboard($d, $e);
+        if ($events === null) {
             $GLOBALS['UMBRAL_ERRORS'] = ($GLOBALS['UMBRAL_ERRORS'] ?? 0) + 1;
-            log_line("ERROR basquet/NBA (ESPN): no respondió el calendario " . gmdate('Y-m-d', $d));
+            log_line('ERROR basquet/NBA (ESPN): no respondió el calendario ' . gmdate('Y-m-d', $d) . ' (' . ($GLOBALS['ESPN_LAST'] ?? '?') . ')');
             return $memo = $old();
         }
-        foreach ($j['events'] ?? [] as $ev) {
+        foreach ($events as $ev) {
             $type = (int)($ev['season']['type'] ?? 2);
             if ($type === 1 || $type === 4) continue; // pretemporada / fuera de temporada
             $all[(string)$ev['id']] = $ev;
@@ -69,7 +105,7 @@ function espn_nba_events(array $cfg, array $league): array
     }
     $all = array_values($all);
     file_put_contents($cachePath, json_encode($all));
-    log_line('OK basquet/NBA (ESPN): ' . count($all) . " partidos (temporada $season, $chunks consultas)");
+    log_line('OK basquet/NBA (ESPN): ' . count($all) . " partidos (temporada $season, $chunks bloques, " . espn_base() . ')');
     return $memo = $all;
 }
 
@@ -157,7 +193,7 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
         $j = espn_fetch(espn_base() . '/summary?event=' . urlencode((string)$eid));
         usleep((int)(getenv('ESPN_PAUSE_MS') ?: 400) * 1000);
         $teamsBox = $j['boxscore']['players'] ?? null;
-        if (!$teamsBox) { $fail++; if ($fail >= 8) break; continue; }
+        if (!$teamsBox) { $fail++; if ($fail === 1) log_line('Aviso jugadores NBA: ' . ($GLOBALS['ESPN_LAST'] ?? 'planilla vacía')); if ($fail >= 8) break; continue; }
         foreach ($teamsBox as $tb) {
             $tid = (int)($tb['team']['id'] ?? 0);
             $isHome = $tid === $g['home_id'];
