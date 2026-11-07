@@ -248,6 +248,9 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 .kp .s{font-family:var(--mono);color:var(--muted);white-space:nowrap;font-size:12px}
 @media (max-width:720px){.pl-row{grid-template-columns:minmax(0,1fr) repeat(3,52px)}.pl-row .st.x{display:none}}
 
+.live-pill{flex:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:#fff;background:#E5484D;border-radius:999px;padding:2px 8px;display:inline-flex;align-items:center;gap:5px}
+.live-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.25}}
 /* Jugadores v2 */
 .pl-row{grid-template-columns:minmax(0,2.2fr) repeat(5,minmax(52px,.6fr)) 84px}
 .pl-row .sp{display:flex;justify-content:flex-end;align-items:center;font-family:var(--mono);font-size:11px}
@@ -296,8 +299,8 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 /* Tarjetas de pronóstico: línea superior sin cortes raros */
 .pick .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
 .pick .meta .lgname{overflow:hidden;text-overflow:ellipsis;min-width:0}
-.pick .tn{flex:1}
-.pick .tn > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pick .tn{flex:1;justify-content:flex-start}
+.pick .tn > span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:720px){
   .hits,.splits{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pl-row{grid-template-columns:minmax(0,1fr) repeat(3,52px)}
@@ -561,7 +564,10 @@ function dateStr(ts,opts){return new Date(ts*1000).toLocaleDateString('es-PE',Ob
 function dayLabel(key){var today=dayKey(Date.now()/1000),tom=dayKey(Date.now()/1000+86400);if(key===today)return 'Hoy';if(key===tom)return 'Mañana';var p=key.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2],12)).toLocaleDateString('es-PE',{timeZone:'UTC',weekday:'short',day:'numeric'}).replace('.','');}
 
 function pickFor(m,th){var a=m.markets.filter(function(x){return x.p>=th;});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
-function dayMatches(){var k=DAYS[state.day];return DATA.matches.filter(function(m){return dayKey(m.ts)===k;});}
+// Duración aproximada de cada deporte: pasado ese tiempo el partido ya terminó y deja de mostrarse
+var DUR={futbol:2.1,basquet:2.6,tenis:2.5};
+function liveState(m){var now=Date.now()/1000,d=(DUR[m.sport]||3)*3600;if(m.ts>now)return 'pre';return m.ts+d>now?'live':'done';}
+function dayMatches(){var k=DAYS[state.day];return DATA.matches.filter(function(m){return dayKey(m.ts)===k&&liveState(m)!=='done';});}
 
 /* ---------- regla ---------- */
 var canvas=document.getElementById('ruler'),ctx=canvas.getContext('2d');
@@ -614,7 +620,7 @@ function renderPicks(){
   if(!rows.length){elPicks.innerHTML='<div class="empty"><strong>Ningún partido supera '+pct(th)+'% con estos filtros</strong>Baja el umbral en la regla, cambia de deporte o de día.</div>';return;}
   elPicks.innerHTML=rows.map(function(r){var f=r.f,m=r.pk.market,sp=SPORT_BY[f.sport]||{name:f.sport};
     return '<button class="pick" data-id="'+esc(f.id)+'" aria-label="Ver detalle de '+esc(f.home)+' contra '+esc(f.away)+'">'+
-      '<div style="min-width:0"><div class="meta"><span class="sport" title="'+esc(sp.name)+'">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span><span class="num" style="flex:none">'+timeStr(f.ts)+'</span><span>·</span><span class="lgname" title="'+esc(f.league)+'">'+esc(f.league)+'</span></div>'+
+      '<div style="min-width:0"><div class="meta"><span class="sport" title="'+esc(sp.name)+'">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span>'+(liveState(f)==='live'?'<span class="live-pill">EN JUEGO</span>':'<span class="num" style="flex:none">'+timeStr(f.ts)+'</span>')+'<span>·</span><span class="lgname" title="'+esc(f.league)+'">'+esc(f.league)+'</span></div>'+
       '<div class="teams"><span><span class="tn">'+logo(f.logoH)+'<span>'+esc(f.home)+'</span></span>'+formHTML(f.formH)+'</span><span><span class="tn">'+logo(f.logoA)+'<span>'+esc(f.away)+'</span></span>'+formHTML(f.formA)+'</span></div>'+
       '<div class="market"><span class="name">'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
       '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+
