@@ -2,6 +2,7 @@
 $envKey = getenv('API_SPORTS_KEY');          // clave de API-Sports (desde GitHub)
 $fdKey  = getenv('FOOTBALL_DATA_KEY');       // clave de football-data.org (desde GitHub)
 $apiSportsPaid = getenv('API_SPORTS_PAID') === '1'; // pon API_SPORTS_PAID=1 si pagas el plan Pro
+$bdlKey = getenv('BALLDONTLIE_KEY');         // clave gratis de BallDontLie (NBA, desde GitHub)
 /**
  * Umbral Analytics — configuración
  * Es el único archivo que necesitas editar.
@@ -19,9 +20,12 @@ return [
     // Clave de football-data.org (gratis, solo fútbol, 12 competiciones de la temporada actual)
     'football_data_key' => $fdKey ?: '',
 
+    // Clave de BallDontLie (opcional; la NBA usa ESPN, que no pide clave)
+    'balldontlie_key' => $bdlKey ?: '',
+
     // Modo prueba: true = usa datos simulados de la carpeta mock/ (no gasta consultas). Pon false para datos reales.
     // (Si la clave viene de GitHub, el modo prueba se apaga solo)
-    'mock'         => ($envKey || $fdKey) ? false : true,
+    'mock'         => ($envKey || $fdKey || $bdlKey) ? false : true,
 
     // Zona horaria de la web
     'timezone'     => 'America/Lima',
@@ -72,11 +76,17 @@ return [
             ],
         ],
         'basquet' => [
-            'enabled' => !$fdKey || $apiSportsPaid,
+            // NBA: con datos reales sale de ESPN (gratis, sin clave). Con API_SPORTS_PAID=1 usa API-Sports.
+            'enabled' => true,
+            'source' => $apiSportsPaid ? 'apisports' : (($envKey || $fdKey || $bdlKey) ? (getenv('NBA_SOURCE') ?: 'espn') : 'apisports'),
+            'players' => true, // estadísticas de jugadores (solo con ESPN)
             'name' => 'Básquet', 'host' => 'https://v1.basketball.api-sports.io', 'endpoint' => 'games',
             'model' => 'normal', 'sd' => 12.5, 'tsd' => 17, 'alt' => 7, 'talt' => 13, 'home' => 2.5,
-            'leagues' => [
+            'leagues' => ($apiSportsPaid || !($envKey || $fdKey || $bdlKey)) ? [
                 ['id' => 12, 'season' => '2026-2027', 'name' => 'NBA', 'on' => true],
+            ] : [
+                // 'season' => 'auto' = temporada en curso (la que empieza en octubre)
+                ['code' => 'NBA', 'season' => 'auto', 'name' => 'NBA', 'on' => true],
             ],
         ],
         'beisbol' => [

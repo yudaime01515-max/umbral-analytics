@@ -217,6 +217,36 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 .loading{color:var(--muted);padding:40px 0;text-align:center}
 .res.void{background:rgba(154,166,188,.16);color:var(--muted)}
 .res.pend{background:rgba(255,90,54,.12);color:var(--accent)}
+/* Jugadores NBA */
+#pOverlay{z-index:60}
+.pl-tools{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.pl-list{display:grid;gap:8px}
+.pl-row{display:grid;grid-template-columns:minmax(0,2.2fr) repeat(5,minmax(52px,.6fr));gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 14px;text-align:left;cursor:pointer;width:100%;color:var(--text)}
+.pl-row:hover{border-color:#3A4A6C}
+.pl-row.head{background:transparent;border:0;cursor:default;padding:0 14px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.pl-row .st{font-family:var(--mono);text-align:right;font-size:15px}
+.pl-row .st small{display:block;color:var(--muted);font-size:11px}
+.pl-row .st.on{color:var(--accent);font-weight:600}
+.who{display:flex;align-items:center;gap:12px;min-width:0}
+.who .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who .tm{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:6px}
+.face{width:42px;height:42px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:none;font-family:var(--display);font-weight:800;font-size:16px;color:var(--muted)}
+.face img{width:100%;height:100%;object-fit:cover}
+.face.big{width:84px;height:84px;font-size:30px}
+.p-head{display:flex;gap:16px;align-items:center}
+.p-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.p-tiles > div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.p-tiles .k{color:var(--muted);font-size:12px}
+.p-tiles .v{font-family:var(--display);font-weight:800;font-size:32px;line-height:1.05}
+.p-tiles .l5{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.p-tiles .l5 b.up{color:var(--good)}.p-tiles .l5 b.dn{color:var(--bad)}
+.key-pl{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.key-pl h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;font-size:15px}
+.kp{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border:0;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer;background:none;width:100%;color:var(--text);text-align:left}
+.kp:last-child{border-bottom:0}
+.kp:hover .n{color:var(--accent)}
+.kp .s{font-family:var(--mono);color:var(--muted);white-space:nowrap;font-size:12px}
+@media (max-width:720px){.pl-row{grid-template-columns:minmax(0,1fr) repeat(3,52px)}.pl-row .st.x{display:none}}
 </style>
 </head>
 <body>
@@ -233,6 +263,7 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
     <nav class="views" aria-label="Secciones">
       <a href="#pronosticos" data-view="pronosticos">Pronósticos</a>
       <a href="#historial" data-view="historial">Historial</a>
+      <a href="#nba" data-view="nba" id="navNba" hidden>Jugadores NBA</a>
       <a href="#metodo" data-view="metodo">Cómo calculamos</a>
     </nav>
     <span class="updated" id="updated"><i></i><span>Cargando…</span></span>
@@ -328,6 +359,26 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
   </div>
 </section>
 
+<section class="view" id="view-nba" aria-label="Jugadores NBA">
+  <div class="wrap">
+    <h2 class="section-title">Jugadores NBA</h2>
+    <p class="section-lead">Promedios de la temporada y de los últimos 5 partidos de cada jugador. Toca un jugador para ver su historial partido a partido.</p>
+    <div class="pl-tools">
+      <label class="field" for="plQ">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Buscar jugador o equipo</span>
+        <input id="plQ" type="search" placeholder="Buscar jugador o equipo">
+      </label>
+      <label class="field" for="plTeam"><span class="mono" style="color:var(--muted)">Equipo</span><select id="plTeam"><option value="">Todos</option></select></label>
+      <label class="field" for="plSort"><span class="mono" style="color:var(--muted)">Orden</span>
+        <select id="plSort"><option value="pts">Puntos</option><option value="reb">Rebotes</option><option value="ast">Asistencias</option><option value="tpm">Triples</option><option value="min">Minutos</option></select>
+      </label>
+    </div>
+    <div class="pl-list" id="plList"><div class="loading">Cargando jugadores…</div></div>
+    <p style="color:var(--muted);font-size:13px;margin-top:14px" id="plNote"></p>
+  </div>
+</section>
+
 <section class="view" id="view-metodo" aria-label="Cómo calculamos">
   <div class="wrap">
     <h2 class="section-title">Cómo calculamos</h2>
@@ -352,12 +403,26 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
       <div class="brand-name" style="font-size:24px"><span data-brand-short>Umbral</span><span class="sub">ANALYTICS</span></div>
       <p style="margin:10px 0 0">Probabilidades deportivas calculadas con modelos estadísticos y datos oficiales. Hecho en Perú.</p>
     </div>
-    <div><h4>Secciones</h4><a href="#pronosticos">Pronósticos</a><a href="#historial">Historial</a><a href="#metodo">Cómo calculamos</a></div>
+    <div><h4>Secciones</h4><a href="#pronosticos">Pronósticos</a><a href="#historial">Historial</a><a href="#nba">Jugadores NBA</a><a href="#metodo">Cómo calculamos</a></div>
     <div><h4>Legal</h4><a href="#metodo">Juego responsable</a><a href="privacidad.html">Política de privacidad</a><a href="terminos.html">Términos y condiciones</a></div>
     <div><h4>Contacto</h4><span id="contact"></span></div>
   </div>
   <div class="copy">© <span id="year"></span> <span data-brand>Umbral Analytics</span> · Sitio para mayores de 18 años</div>
 </footer>
+
+<div class="overlay" id="pOverlay" role="dialog" aria-modal="true" aria-labelledby="pTitle">
+  <div class="dialog">
+    <div class="d-head">
+      <div class="p-head"><div id="pFace"></div><div>
+        <div class="mono" id="pTeam" style="color:var(--accent);display:flex;align-items:center;gap:6px"></div>
+        <h2 id="pTitle"></h2>
+        <div class="meta" id="pMeta"></div>
+      </div></div>
+      <button class="close" id="pClose" aria-label="Cerrar jugador"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="d-body" id="pBody"></div>
+  </div>
+</div>
 
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <div class="dialog">
@@ -371,6 +436,7 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
     </div>
     <div class="d-body">
       <div class="d-facts" id="dFacts"></div>
+      <div id="dPlayers" hidden></div>
       <div>
         <h3 style="font-size:18px;margin-bottom:4px">Todos los mercados</h3>
         <p style="color:var(--muted);font-size:14px;margin:0 0 8px">La línea blanca marca el umbral. En naranja, los que se publicarían.</p>
@@ -509,6 +575,7 @@ function openDetail(id){
   var mk=f.markets.slice().sort(function(a,b){return b.p-a.p;});
   document.getElementById('dMarkets').innerHTML=mk.map(function(m){return '<div class="mk-row'+(m.p>=th?' above':'')+'"><span>'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%;background:'+(m.p>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(m.p*100).toFixed(1)+'%</span><span class="fo">'+fair(m.p)+'</span></div>';}).join('');
   renderDist(f.dist,f);
+  renderKeyPlayers(f);
   lastFocus=document.activeElement;overlay.classList.add('on');document.getElementById('dClose').focus();document.body.style.overflow='hidden';
 }
 function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
@@ -592,13 +659,84 @@ var METHOD={
 };
 function renderMethod(){document.getElementById('method').innerHTML=DATA.sports.map(function(s){var m=METHOD[s.id]||[s.name,''];return '<div class="card"><h3>'+icon(s.id,18)+esc(m[0])+'</h3><p>'+esc(m[1])+'</p></div>';}).join('');}
 
+/* ---------- jugadores NBA ---------- */
+var NBA=null,nbaP=null,plState={q:'',team:'',sort:'pts'};
+// fila: [fecha, rival, local, min, pts, reb, ast, triples, robos, tapas]
+var COL={min:3,pts:4,reb:5,ast:6,tpm:7,stl:8,blk:9};
+function getNBA(){
+  if(!nbaP)nbaP=loadJSON('nba.json',true).then(function(d){NBA=(d&&d.players)?d:{teams:{},players:{}};
+    Object.keys(NBA.players).forEach(function(id){var p=NBA.players[id];p.id=id;p.avg=avgOf(p.h);p.l5=avgOf(p.h.slice(-5));});
+    var sel=document.getElementById('plTeam');Object.keys(NBA.teams).sort(function(a,b){return NBA.teams[a].n.localeCompare(NBA.teams[b].n);}).forEach(function(id){var o=document.createElement('option');o.value=id;o.textContent=NBA.teams[id].n;sel.appendChild(o);});
+    return NBA;}).catch(function(){NBA={teams:{},players:{}};return NBA;});
+  return nbaP;
+}
+function avgOf(h){var r={gp:h.length};Object.keys(COL).forEach(function(k){var s=0;h.forEach(function(g){s+=g[COL[k]];});r[k]=h.length?s/h.length:0;});return r;}
+function f1(x){return (Math.round(x*10)/10).toFixed(1);}
+function initials(n){return String(n||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();}
+function faceHTML(p,big){var ini=esc(initials(p.n));return '<span class="face'+(big?' big':'')+'" data-i="'+ini+'">'+(p.ph?'<img src="'+esc(p.ph)+'" alt="" loading="lazy" onerror="this.parentNode.textContent=this.parentNode.dataset.i">':ini)+'</span>';}
+function teamOf(id){return (NBA&&NBA.teams[id])||{n:'',ab:'',logo:''};}
+function renderPlayers(){
+  var el=document.getElementById('plList'),q=plState.q.trim().toLowerCase(),k=plState.sort,narrow=!!(q||plState.team);
+  var list=Object.keys(NBA.players).map(function(id){return NBA.players[id];}).filter(function(p){
+    if(plState.team&&String(p.t)!==plState.team)return false;
+    if(q){var t=teamOf(p.t);if((p.n+' '+t.n+' '+t.ab).toLowerCase().indexOf(q)<0)return false;}
+    return p.avg.gp>=(narrow?1:3);});
+  list.sort(function(a,b){return b.avg[k]-a.avg[k];});
+  var total=list.length;list=list.slice(0,narrow?200:60);
+  document.getElementById('plNote').textContent='';
+  if(!total){el.innerHTML='<div class="empty"><strong>Sin jugadores</strong>'+(Object.keys(NBA.players).length?'Prueba con otro nombre o equipo.':'Las estadísticas aparecen tras la próxima actualización.')+'</div>';return;}
+  var cell=function(p,c,x){return '<span class="st'+(c===k?' on':'')+(x?' x':'')+'">'+f1(p.avg[c])+'<small>Ú5 '+f1(p.l5[c])+'</small></span>';};
+  el.innerHTML='<div class="pl-row head"><span>Jugador</span><span class="st">PTS</span><span class="st">REB</span><span class="st">AST</span><span class="st x">3PT</span><span class="st x">MIN</span></div>'+
+    list.map(function(p){var t=teamOf(p.t);return '<button class="pl-row" data-pid="'+esc(p.id)+'"><span class="who">'+faceHTML(p)+'<span style="min-width:0"><span class="nm" style="display:block">'+esc(p.n)+'</span><span class="tm">'+logo(t.logo)+esc(t.ab||t.n)+(p.pos?' · '+esc(p.pos):'')+' · '+p.avg.gp+' PJ</span></span></span>'+
+      cell(p,'pts')+cell(p,'reb')+cell(p,'ast')+cell(p,'tpm',1)+cell(p,'min',1)+'</button>';}).join('');
+  document.getElementById('plNote').textContent=(total>list.length?'Mostrando '+list.length+' de '+total+'. Busca o elige un equipo para ver más. ':'')+'Ú5 = promedio de los últimos 5 partidos. Datos: ESPN.';
+}
+var pOverlay=document.getElementById('pOverlay'),pFrom=null;
+function openPlayer(id){
+  var p=NBA&&NBA.players[id];if(!p)return;var t=teamOf(p.t);
+  document.getElementById('pFace').innerHTML=faceHTML(p,true);
+  document.getElementById('pTeam').innerHTML=logo(t.logo)+esc(t.n);
+  document.getElementById('pTitle').textContent=p.n;
+  document.getElementById('pMeta').textContent=(p.pos?'Posición '+p.pos+' · ':'')+p.avg.gp+' partidos jugados';
+  var tile=function(lbl,c){var d=p.l5[c]-p.avg[c],cls=Math.abs(d)<0.05?'':(d>0?'up':'dn');return '<div><div class="k">'+lbl+'</div><div class="v num">'+f1(p.avg[c])+'</div><div class="l5">Últ. 5: <b class="'+cls+'">'+f1(p.l5[c])+'</b></div></div>';};
+  var h=p.h.slice(-10),avg=p.avg.pts,over=h.filter(function(g){return g[4]>avg;}).length;
+  var maxv=Math.max.apply(null,h.map(function(g){return g[4];}).concat([avg,10])),bw=44,gap=10,H=200,base=160,W=h.length*(bw+gap)+20;
+  var svg='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Puntos en los últimos '+h.length+' partidos"><line x1="0" y1="'+base+'" x2="'+W+'" y2="'+base+'" stroke="#22304C"/>';
+  h.forEach(function(g,i){var bh=Math.max(2,g[4]/maxv*(base-28)),x=10+i*(bw+gap),o=teamOf(g[1]);
+    svg+='<rect x="'+x+'" y="'+(base-bh)+'" width="'+bw+'" height="'+bh+'" rx="5" fill="'+(g[4]>avg?'#FF5A36':'#3A4868')+'"/>';
+    svg+='<text x="'+(x+bw/2)+'" y="'+(base-bh-7)+'" font-size="12" text-anchor="middle" fill="#EEF2F8">'+g[4]+'</text>';
+    svg+='<text x="'+(x+bw/2)+'" y="'+(base+17)+'" font-size="10.5" text-anchor="middle" fill="#9AA6BC">'+(g[2]?'':'@')+esc(o.ab||'?')+'</text>';
+    svg+='<text x="'+(x+bw/2)+'" y="'+(base+32)+'" font-size="10" text-anchor="middle" fill="#9AA6BC">'+esc(dateStr(g[0],{day:'numeric',month:'short'}))+'</text>';});
+  var ay=base-avg/maxv*(base-28);svg+='<line x1="0" y1="'+ay+'" x2="'+W+'" y2="'+ay+'" stroke="#EEF2F8" stroke-dasharray="4 4" opacity=".6"/></svg>';
+  var rows=p.h.slice(-15).reverse().map(function(g){var o=teamOf(g[1]);return '<tr><td>'+esc(dateStr(g[0],{day:'numeric',month:'short'}))+'</td><td><span class="tn">'+(g[2]?'vs ':'@ ')+logo(o.logo)+esc(o.ab||o.n)+'</span></td><td>'+g[3]+'</td><td><b>'+g[4]+'</b></td><td>'+g[5]+'</td><td>'+g[6]+'</td><td>'+g[7]+'</td><td>'+g[8]+'</td><td>'+g[9]+'</td></tr>';}).join('');
+  var next=DATA&&DATA.matches.filter(function(m){return m.sport==='basquet'&&(String(m.hid)===String(p.t)||String(m.aid)===String(p.t))&&m.ts>Date.now()/1000;})[0];
+  document.getElementById('pBody').innerHTML='<div class="p-tiles">'+tile('Puntos','pts')+tile('Rebotes','reb')+tile('Asistencias','ast')+tile('Triples','tpm')+tile('Minutos','min')+tile('Robos','stl')+tile('Tapones','blk')+'</div>'+
+    (next?'<div class="note" style="margin:0"><b class="tag">PRÓXIMO</b><div><strong>'+esc(next.home)+' vs '+esc(next.away)+'</strong> · '+esc(dayLabel(dayKey(next.ts)))+' '+esc(timeStr(next.ts))+'</div></div>':'')+
+    '<div><h3 style="font-size:18px;margin-bottom:4px">Puntos en los últimos '+h.length+' partidos</h3><p style="color:var(--muted);font-size:14px;margin:0 0 12px">Superó su promedio ('+f1(avg)+') en <b style="color:var(--text)">'+over+' de '+h.length+'</b>. La línea punteada marca el promedio de la temporada.</p><div class="dist-wrap">'+svg+'</div></div>'+
+    '<div><h3 style="font-size:18px;margin-bottom:8px">Partido a partido</h3><div class="tbl"><table><thead><tr><th>Fecha</th><th>Rival</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>3PT</th><th>ROB</th><th>TAP</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  pFrom=document.activeElement;pOverlay.classList.add('on');pOverlay.scrollTop=0;document.getElementById('pClose').focus();document.body.style.overflow='hidden';
+}
+function closePlayer(){pOverlay.classList.remove('on');if(!overlay.classList.contains('on'))document.body.style.overflow='';if(pFrom)pFrom.focus();}
+function renderKeyPlayers(f){
+  var box=document.getElementById('dPlayers');box.hidden=true;box.innerHTML='';
+  if(f.sport!=='basquet'||f.hid==null)return;
+  getNBA().then(function(){
+    var side=function(tid,name){var ps=Object.keys(NBA.players).map(function(id){return NBA.players[id];}).filter(function(p){return String(p.t)===String(tid);});
+      ps.sort(function(a,b){return b.avg.pts-a.avg.pts;});ps=ps.slice(0,5);if(!ps.length)return '';var t=teamOf(tid);
+      return '<div><h4>'+logo(t.logo)+esc(name)+'</h4>'+ps.map(function(p){return '<button class="kp" data-pid="'+esc(p.id)+'"><span class="n">'+esc(p.n)+'</span><span class="s">'+f1(p.avg.pts)+' PTS · '+f1(p.avg.reb)+' REB · '+f1(p.avg.ast)+' AST</span></button>';}).join('')+'</div>';};
+    var html=side(f.hid,f.home)+side(f.aid,f.away);if(!html)return;
+    box.innerHTML='<h3 style="font-size:18px;margin-bottom:4px">Jugadores clave</h3><p style="color:var(--muted);font-size:14px;margin:0 0 10px">Los 5 que más anotan de cada equipo en la temporada. Toca uno para ver su historial.</p><div class="key-pl">'+html+'</div>';
+    box.hidden=false;});
+}
+
 /* ---------- vistas ---------- */
-var VIEWS=['pronosticos','historial','metodo'];
+var VIEWS=['pronosticos','historial','nba','metodo'];
 function route(){
   var v=(location.hash||'').replace('#','');if(VIEWS.indexOf(v)<0)v='pronosticos';
   VIEWS.forEach(function(x){document.getElementById('view-'+x).classList.toggle('on',x===v);});
   document.querySelectorAll('nav.views a').forEach(function(a){if(a.dataset.view===v)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
   if(v==='pronosticos')requestAnimationFrame(drawRuler);
+  if(v==='nba')getNBA().then(renderPlayers);
 }
 
 /* ---------- carga ---------- */
@@ -621,6 +759,7 @@ function boot(){
   var today=dayKey(Date.now()/1000),keys={};DATA.matches.forEach(function(m){var k=dayKey(m.ts);if(k>=today)keys[k]=1;});
   DAYS=Object.keys(keys).sort().slice(0,4);if(!DAYS.length)DAYS=[today];
   document.getElementById('heroDate').textContent=new Date().toLocaleDateString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('navNba').hidden=!SPORT_BY.basquet||DATA.mock;
   renderDays();renderMethod();renderPicks();buildHistory();route();
 }
 document.getElementById('year').textContent=new Date().getFullYear();
@@ -639,8 +778,15 @@ var sortSel=document.getElementById('sort');sortSel.value=state.sort;
 sortSel.addEventListener('change',function(e){state.sort=e.target.value;if(DATA)renderPicks();save();});
 elPicks.addEventListener('click',function(e){var b=e.target.closest('.pick');if(b)openDetail(b.dataset.id);});
 document.getElementById('dClose').addEventListener('click',closeDetail);
+document.getElementById('plQ').addEventListener('input',function(e){plState.q=e.target.value;if(NBA)renderPlayers();});
+document.getElementById('plTeam').addEventListener('change',function(e){plState.team=e.target.value;if(NBA)renderPlayers();});
+document.getElementById('plSort').addEventListener('change',function(e){plState.sort=e.target.value;if(NBA)renderPlayers();});
+document.getElementById('plList').addEventListener('click',function(e){var b=e.target.closest('[data-pid]');if(b)openPlayer(b.dataset.pid);});
+document.getElementById('dPlayers').addEventListener('click',function(e){var b=e.target.closest('[data-pid]');if(b)openPlayer(b.dataset.pid);});
+document.getElementById('pClose').addEventListener('click',closePlayer);
+pOverlay.addEventListener('click',function(e){if(e.target===pOverlay)closePlayer();});
 overlay.addEventListener('click',function(e){if(e.target===overlay)closeDetail();});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'&&overlay.classList.contains('on'))closeDetail();});
+document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(pOverlay.classList.contains('on'))closePlayer();else if(overlay.classList.contains('on'))closeDetail();});
 window.addEventListener('resize',drawRuler);
 window.addEventListener('hashchange',route);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawRuler);

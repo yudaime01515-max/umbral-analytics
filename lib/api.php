@@ -12,6 +12,8 @@ const VOID_STATUS = ['PST', 'CANC', 'ABD', 'AWD', 'WO', 'POST', 'INTR', 'SUSP'];
 function api_get(array $cfg, string $sportKey, array $sport, array $league): array
 {
     $root = dirname(__DIR__);
+    if (($sport['source'] ?? '') === 'espn') return espn_nba_events($cfg, $league);
+    if (($sport['source'] ?? '') === 'balldontlie') return bdl_get($cfg, $sportKey, $league);
     $fd = ($sport['source'] ?? 'apisports') === 'footballdata';
     $listKey = $fd ? 'matches' : 'response';
     $file = $fd
@@ -83,9 +85,90 @@ function api_get(array $cfg, string $sportKey, array $sport, array $league): arr
     return $json[$listKey] ?? [];
 }
 
+/**
+ * BallDontLie (NBA): baja todos los partidos de la temporada en curso, página por página.
+ * Plan gratis = solo temporada actual y pocas consultas por minuto, así que va despacio y reintenta si le dicen "espera" (429).
+ */
+function bdl_get(array $cfg, string $sportKey, array $league): array
+{
+    $root = dirname(__DIR__);
+    $now = (int)($GLOBALS['UMBRAL_NOW'] ?? time());
+    $season = $league['season'] ?? 'auto';
+    if ($season === 'auto') {
+        $y = (int)gmdate('Y', $now);
+        $season = ((int)gmdate('n', $now) >= 9) ? $y : $y - 1; // la temporada 2026-27 es "2026"
+    }
+    $cacheDir = defined('UMBRAL_CACHE') ? UMBRAL_CACHE : "$root/data/cache";
+    if (!is_dir($cacheDir)) mkdir($cacheDir, 0775, true);
+    $cachePath = "$cacheDir/$sportKey-bdl-$season.json";
+    $old = fn() => is_file($cachePath) ? (json_decode(file_get_contents($cachePath), true)['data'] ?? []) : [];
+    if (is_file($cachePath) && filemtime($cachePath) > time() - $cfg['cache_minutes'] * 60) return $old();
+
+    $base = getenv('BDL_BASE') ?: 'https://api.balldontlie.io/v1';
+    $end = gmdate('Y-m-d', $now + (($cfg['days_ahead'] ?? 3) + 1) * 86400);
+    $all = []; $cursor = null; $pages = 0;
+    do {
+        $url = "$base/games?seasons[]=$season&per_page=100&end_date=$end" . ($cursor !== null ? "&cursor=$cursor" : '');
+        $tries = 0;
+        while (true) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30,
+                CURLOPT_HTTPHEADER => ['Authorization: ' . $cfg['balldontlie_key']],
+            ]);
+            $body = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+            if ($code === 429 && ++$tries <= 3) { sleep((int)(getenv('BDL_WAIT') ?: 61)); continue; }
+            break;
+        }
+        if ($body === false || $code !== 200) {
+            $GLOBALS['UMBRAL_ERRORS'] = ($GLOBALS['UMBRAL_ERRORS'] ?? 0) + 1;
+            log_line("ERROR $sportKey/{$league['name']}: HTTP $code $err (página " . ($pages + 1) . ')');
+            return $old(); // si falla, usa la última copia guardada
+        }
+        $json = json_decode($body, true);
+        foreach ($json['data'] ?? [] as $g) $all[] = $g;
+        $cursor = $json['meta']['next_cursor'] ?? null;
+        $pages++;
+        if ($cursor !== null) usleep((int)(getenv('BDL_PAUSE_MS') ?: 2500) * 1000);
+    } while ($cursor !== null && $pages < 40);
+
+    file_put_contents($cachePath, json_encode(['data' => $all]));
+    log_line("OK $sportKey/{$league['name']}: " . count($all) . " partidos (temporada $season, $pages páginas)");
+    return $all;
+}
+
 /** Normaliza un partido de cualquier deporte. */
 function normalize(string $sportKey, array $g, string $leagueName, string $source = 'apisports'): ?array
 {
+    if ($source === 'espn') return espn_normalize($g, $leagueName);
+    if ($source === 'balldontlie') {
+        $st = (string)($g['status'] ?? '');
+        $period = (int)($g['period'] ?? 0);
+        // Hora del partido: 'datetime' si viene; si no, el estado a veces trae la hora ISO; si no, la fecha
+        $ts = !empty($g['datetime']) ? strtotime($g['datetime']) : false;
+        if (!$ts && preg_match('/^\d{4}-\d{2}-\d{2}T/', $st)) $ts = strtotime($st);
+        if (!$ts) $ts = strtotime(substr((string)($g['date'] ?? ''), 0, 10) . ' 23:30:00 UTC');
+        if (stripos($st, 'final') === 0) $status = 'FT';
+        elseif (preg_match('/postpon/i', $st)) $status = 'PST';
+        elseif (preg_match('/cancel/i', $st)) $status = 'CANC';
+        elseif ($period > 0) $status = 'LIVE';
+        else $status = 'NS';
+        $done = $status === 'FT';
+        $h = $g['home_team'] ?? []; $v = $g['visitor_team'] ?? [];
+        return [
+            'id' => 'basquet-bdl-' . ($g['id'] ?? 0),
+            'ts' => (int)$ts,
+            'status' => $status,
+            'league' => $leagueName,
+            'home' => $h['full_name'] ?? $h['name'] ?? '?', 'away' => $v['full_name'] ?? $v['name'] ?? '?',
+            'home_id' => $h['id'] ?? 0, 'away_id' => $v['id'] ?? 0,
+            'logo_home' => '', 'logo_away' => '',
+            'hs' => $done ? (int)$g['home_team_score'] : null, 'as' => $done ? (int)$g['visitor_team_score'] : null,
+        ];
+    }
     if ($source === 'footballdata') {
         $map = ['FINISHED' => 'FT', 'AWARDED' => 'AW', 'SCHEDULED' => 'NS', 'TIMED' => 'NS', 'POSTPONED' => 'PST',
                 'CANCELLED' => 'CANC', 'SUSPENDED' => 'SUSP', 'IN_PLAY' => 'LIVE', 'PAUSED' => 'LIVE', 'LIVE' => 'LIVE'];

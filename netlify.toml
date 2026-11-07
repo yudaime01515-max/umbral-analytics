@@ -1,12 +1,6 @@
-# Netlify publica solo la carpeta "public". El código y la configuración no quedan visibles.
 [build]
   publish = "public"
   command = ""
-  # Cada publicación cuesta créditos. Si un cambio solo toca los datos (public/data),
-  # no se vuelve a publicar: la web lee los datos directo de GitHub.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)public/data'"
-
-[[headers]]
-  for = "/data/*"
-  [headers.values]
-    Cache-Control = "no-cache"
+  # Solo se publica si cambia la página (carpeta public), sin contar los datos.
+  # Los cambios en config.php, lib/ o .github ya no gastan créditos.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- public ':(exclude)public/data'"

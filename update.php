@@ -8,6 +8,7 @@ $root = __DIR__;
 $cfg = require "$root/config.php";
 require "$root/lib/api.php";
 require "$root/lib/models.php";
+require "$root/lib/espn.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -48,6 +49,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         if (empty($league['on']) || (empty($league['id']) && empty($league['code']))) continue;
         $any = true;
         $raw = api_get($cfg, $sportKey, $sport, $league);
+        if (($sport['source'] ?? '') === 'espn' && !empty($sport['players'])) $nbaEvents = $raw;
         $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name'], $sport['source'] ?? 'apisports'), $raw)));
 
         $finished = array_values(array_filter($games, fn($g) => in_array($g['status'], FINISHED, true) && $g['hs'] !== null && $g['ts'] < $now));
@@ -67,6 +69,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             $matches[] = [
                 'id' => $g['id'], 'sport' => $sportKey, 'league' => $g['league'], 'ts' => $g['ts'],
                 'home' => $g['home'], 'away' => $g['away'], 'logoH' => $g['logo_home'], 'logoA' => $g['logo_away'],
+                'hid' => $g['home_id'], 'aid' => $g['away_id'],
                 'formH' => recent_form($finished, $g['home_id'], $draws), 'formA' => recent_form($finished, $g['away_id'], $draws),
                 'exp' => $model['exp'], 'dist' => $model['dist'],
                 'markets' => array_map(fn($m) => ['n' => $m['n'], 'p' => $m['p']], $model['markets']),
@@ -84,6 +87,12 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         }
     }
     if ($any) $sportsOut[] = ['id' => $sportKey, 'name' => $sport['name']];
+}
+
+// Estadísticas de jugadores NBA (ESPN). Si falla, la web sigue con lo anterior.
+if (!empty($nbaEvents)) {
+    try { nba_players_update($cfg, $nbaEvents, $dataDir); }
+    catch (Throwable $e) { log_line('ERROR jugadores NBA: ' . $e->getMessage()); }
 }
 
 // Cierra pronósticos pendientes con resultado final
