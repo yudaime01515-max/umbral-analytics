@@ -10,6 +10,7 @@ require "$root/lib/api.php";
 require "$root/lib/models.php";
 require "$root/lib/espn.php";
 require "$root/lib/espn_futbol.php";
+require "$root/lib/tenis.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -48,6 +49,27 @@ $finalScores = [];
 foreach ($cfg['sports'] as $sportKey => $sport) {
     if (isset($sport['enabled']) && !$sport['enabled']) continue;
     $any = false;
+    // Tenis: va por su propio camino (jugadores en vez de equipos)
+    if (($sport['source'] ?? '') === 'espn_tenis') {
+        try { $tn = tenis_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir); }
+        catch (Throwable $e) { log_line('ERROR tenis: ' . $e->getMessage()); continue; }
+        foreach ($tn['final'] as $fid => $fv) $finalScores[$fid] = $fv;
+        foreach ($tn['matches'] as $tm) {
+            $matches[] = $tm;
+            $pick = best_pick($tm['markets'], $th);
+            if ($pick && $tm['ts'] > $now) {
+                $entry = [
+                    'id' => $tm['id'], 'sport' => $sportKey, 'league' => $tm['league'], 'ts' => $tm['ts'],
+                    'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'r' => $pick['r'],
+                    'status' => 'pending', 'score' => null, 'mock' => $isMock,
+                ];
+                if (!isset($histIdx[$tm['id']])) { $history[] = $entry; $histIdx[$tm['id']] = count($history) - 1; }
+                elseif ($history[$histIdx[$tm['id']]]['status'] === 'pending') { $history[$histIdx[$tm['id']]] = $entry; }
+            }
+        }
+        $sportsOut[] = ['id' => $sportKey, 'name' => $sport['name']];
+        continue;
+    }
     foreach ($sport['leagues'] as $league) {
         if (empty($league['on']) || (empty($league['id']) && empty($league['code']))) continue;
         $any = true;

@@ -90,6 +90,15 @@ return [
                 ['code' => 'NBA', 'season' => 'auto', 'name' => 'NBA', 'on' => true],
             ],
         ],
+        'tenis' => [
+            // ATP y WTA desde ESPN (gratis, sin clave). Solo con datos reales.
+            'enabled' => (bool)($envKey || $fdKey || $bdlKey),
+            'name' => 'Tenis', 'source' => 'espn_tenis', 'model' => 'tenis',
+            'leagues' => [
+                ['code' => 'atp', 'name' => 'ATP', 'on' => true],
+                ['code' => 'wta', 'name' => 'WTA', 'on' => true],
+            ],
+        ],
         'beisbol' => [
             'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Béisbol', 'host' => 'https://v1.baseball.api-sports.io', 'endpoint' => 'games',
