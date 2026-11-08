@@ -13,19 +13,14 @@ jobs:
           def g(url):
             try: return json.load(u.urlopen(u.Request(url,headers=H),timeout=20))
             except Exception as e: return {'ERR':str(e)}
-          d=g('https://www.fotmob.com/api/data/matches?date=20261109')
-          ids=[]
-          for lg in d.get('leagues',[]):
-            for m in lg['matches']:
-              ids.append((lg['name'],m['id'],m['home']['name'],m['away']['name'],m.get('status',{}).get('utcTime')))
-          print('===== n',len(ids),ids[:5])
-          for t in ids[:1]:
-            for url in ['https://www.fotmob.com/api/data/matchDetails?matchId=%s'%t[1],'https://www.fotmob.com/api/matchDetails?matchId=%s'%t[1]]:
-              j=g(url); print('=====',url,list(j.keys())[:12], j.get('ERR'))
-              if 'content' in j:
-                lu=(j['content'] or {}).get('lineup') or {}
-                print('===== lineup keys',list(lu.keys()))
-                for side in ['homeTeam','awayTeam']:
-                  tm=lu.get(side) or {}; print('===== '+side, list(tm.keys())); print(json.dumps(tm.get('unavailable'),ensure_ascii=False)[:1500])
-                break
+          for day in ['20261108','20261109','20261110']:
+            d=g('https://www.fotmob.com/api/data/matches?date='+day)
+            ms=[(lg['name'],m) for lg in d.get('leagues',[]) if lg.get('primaryId') in (47,87,55,54,53,131) for m in lg['matches']]
+            print('=====',day,len(ms),[ (n,m['home']['name'],m['away']['name'],m['id']) for n,m in ms[:3]])
+            for n,m in ms[:2]:
+              j=g('https://www.fotmob.com/api/data/matchDetails?matchId=%s'%m['id'])
+              lu=((j.get('content') or {}).get('lineup')) or {}
+              print('===== lu',n,m['home']['name'],list(lu.keys()))
+              for side in ['homeTeam','awayTeam']:
+                tm=lu.get(side) or {}; print('===== '+side, list(tm.keys())); print(json.dumps(tm.get('unavailable'),ensure_ascii=False)[:1200])
           PY
