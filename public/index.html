@@ -278,6 +278,7 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 .lv-row em{display:block;height:100%;background:var(--accent)}
 .lv-team{margin:6px 0 0;display:flex;align-items:center;gap:8px;font-size:15px}
 .lv-grp{margin-top:6px}
+.lv-tag{font-size:10px;font-weight:700;letter-spacing:.04em;color:#F0616D;background:rgba(240,97,109,.14);padding:2px 6px;border-radius:5px;vertical-align:middle}
 .lv-gt{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 .lv-gt small{color:var(--muted);font-size:12px}
 .lv-d{font-size:11px;color:var(--muted);white-space:nowrap}
@@ -623,7 +624,10 @@ function timeStr(ts){return new Date(ts*1000).toLocaleTimeString('es-PE',{timeZo
 function dateStr(ts,opts){return new Date(ts*1000).toLocaleDateString('es-PE',Object.assign({timeZone:TZ},opts)).replace('.','');}
 function dayLabel(key){var today=dayKey(Date.now()/1000),tom=dayKey(Date.now()/1000+86400);if(key===today)return 'Hoy';if(key===tom)return 'Mañana';var p=key.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2],12)).toLocaleDateString('es-PE',{timeZone:'UTC',weekday:'short',day:'numeric'}).replace('.','');}
 
-function pickFor(m,th){var a=m.markets.filter(function(x){return x.p>=th;});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
+function isLiveMk(m){return typeof LIVE_MK!=='undefined'&&!!LIVE_MK[m.id]&&liveState(m)==='live';}
+function mkOf(m){return isLiveMk(m)?LIVE_MK[m.id].markets:m.markets;}
+// En vivo se descarta lo que ya está prácticamente decidido (97% o más): no tiene valor apostarlo
+function pickFor(m,th){var lv=isLiveMk(m),a=mkOf(m).filter(function(x){return x.p>=th&&(!lv||x.p<0.97);});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
 // Duración aproximada de cada deporte: pasado ese tiempo el partido ya terminó y deja de mostrarse
 // Si ESPN ya dijo cómo va el partido, manda eso. Si no, se usa un tiempo máximo generoso por deporte.
 var DUR={futbol:2.6,basquet:3.4,tenis:4.5};
@@ -662,7 +666,7 @@ function renderPicks(){
   var aboveMk=0,matchesWith=0,total=0,rows=[];
   list.forEach(function(f){
     var pk=pickFor(f,th);
-    if(state.sport==='all'||f.sport===state.sport){total++;f.markets.forEach(function(m){if(m.p>=th)aboveMk++;});if(pk)matchesWith++;}
+    if(state.sport==='all'||f.sport===state.sport){total++;mkOf(f).forEach(function(m){if(m.p>=th)aboveMk++;});if(pk)matchesWith++;}
     if(pk){counts.all++;counts[f.sport]=(counts[f.sport]||0)+1;}
     if(!pk)return;
     if(state.sport!=='all'&&f.sport!==state.sport)return;
@@ -687,7 +691,7 @@ function renderPicks(){
     return '<button class="pick" data-id="'+esc(f.id)+'" aria-label="Ver detalle de '+esc(f.home)+' contra '+esc(f.away)+'">'+
       '<div style="min-width:0"><div class="meta"><span class="sport" title="'+esc(sp.name)+'">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span>'+(liveState(f)==='live'?'<span class="live-pill">'+(LIVE[f.id]?esc(String(LIVE[f.id].hs))+' – '+esc(String(LIVE[f.id].as))+(LIVE[f.id].txt?' · '+esc(LIVE[f.id].txt):''):'EN JUEGO')+'</span>':'<span class="num" style="flex:none">'+timeStr(f.ts)+'</span>')+'<span>·</span><span class="lgname" title="'+esc(f.league)+'">'+esc(f.league)+'</span></div>'+
       '<div class="teams"><span><span class="tn">'+logo(f.logoH)+'<span>'+esc(f.home)+'</span></span>'+formHTML(f.formH)+'</span><span><span class="tn">'+logo(f.logoA)+'<span>'+esc(f.away)+'</span></span>'+formHTML(f.formA)+'</span></div>'+
-      '<div class="market"><span class="name">'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
+      '<div class="market"><span class="name">'+esc(m.n)+(isLiveMk(f)?' <small class="lv-tag">EN VIVO · min '+Math.round(LIVE_MK[f.id].t)+'\'</small>':'')+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
       '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+
       '<div class="more"><span>'+(r.pk.count>1?'<b>'+(r.pk.count-1)+'</b> mercado'+(r.pk.count>2?'s':'')+' más sobre el umbral':'Único mercado sobre el umbral')+'</span><span>Ver análisis →</span></div>'+
     '</button>';}).join('');
@@ -1048,7 +1052,7 @@ function renderInjuries(f){
 /* ---------- EN VIVO: marcador y estadísticas directo desde ESPN (sin video) ---------- */
 var ESPN='https://site.api.espn.com/apis/site/v2/sports/';
 var SOC_SLUG={PL:'eng.1',PD:'esp.1',SA:'ita.1',BL1:'ger.1',FL1:'fra.1',CL:'uefa.champions',PPL:'por.1',DED:'ned.1',ELC:'eng.2',PER:'per.1',ARG:'arg.1',BRA:'bra.1',MEX:'mex.1',COL:'col.1',CHI:'chi.1',LIB:'conmebol.libertadores',SUD:'conmebol.sudamericana',MLS:'usa.1',UEL:'uefa.europa',UECL:'uefa.europa.conf',TUR:'tur.1',SCO:'sco.1',BEL:'bel.1',KSA:'ksa.1'};
-var LIVE={},LIVE_EVT={},liveTimer=null,detTimer=null,LIVE_OK=true;
+var LIVE={},LIVE_EVT={},LIVE_MK={},LIVE_MKT={},liveTimer=null,detTimer=null,LIVE_OK=true;
 function ymdLocal(ts){var d=new Date(ts*1000-5*3600*1000);return d.toISOString().slice(0,10).replace(/-/g,'');}
 function jget(url){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});}
 function espnPath(m){
@@ -1090,6 +1094,7 @@ function pollLive(){
         var st=evStatus(f.c.status||f.ev.status),sc=scoreOf(m,f.c),v={hs:sc.hs,as:sc.as,txt:st.txt,state:st.state,seen:st.state==='post'};
         if(JSON.stringify(LIVE[m.id])!==JSON.stringify(v)){LIVE[m.id]=v;changed=true;}});
       if(changed&&!overlay.classList.contains('on')){renderDays();renderPicks();}
+      groups[k].forEach(function(m){if(m.sport==='futbol'&&LIVE[m.id]&&LIVE[m.id].state==='in')liveMkRefresh(m,p[0]);});
     }).catch(function(){LIVE_OK=false;});
   });
 }
@@ -1144,7 +1149,7 @@ function liveMinute(c){
   if(st.clock)return Math.min(95,st.clock/60);
   return (st.period||1)>1?60:20;
 }
-function liveProbs(m,c,hT,aT){
+function liveCalc(m,c,hT,aT){
   var num=function(T,k){var v=statVal(T.statistics,k);return v==null?0:(parseFloat(v)||0);};
   var t=Math.max(1,liveMinute(c)),R=Math.max(1,96-t),w=t/(t+35);
   var sc=scoreOf(m,c),gh=parseInt(sc.hs,10)||0,ga=parseInt(sc.as,10)||0;
@@ -1180,6 +1185,19 @@ function liveProbs(m,c,hT,aT){
     out.push({t:label,sub:'Van '+c0+' ('+cur[k][0]+' – '+cur[k][1]+') · proyección al final: '+proj.toFixed(1),rows:rows});
   };
   stat('c','Córners','córners');stat('y','Tarjetas amarillas','tarjetas amarillas');stat('sot','Remates a portería','remates a portería');stat('sh','Remates','remates');
+  return {t:t,out:out};
+}
+// Guarda los mercados en vivo para que la tarjeta de la lista también recomiende según cómo va el partido
+function storeLiveMk(m,LC){var mk=[];LC.out.forEach(function(g){g.rows.forEach(function(r){mk.push({n:r[0],p:Math.round(r[1]*10000)/10000});});});LIVE_MK[m.id]={t:LC.t,markets:mk};}
+function liveSides(m,j){var teams=(j.boxscore&&j.boxscore.teams)||[];if(teams.length!==2)return null;
+  var hT=teams.filter(function(t){return t.homeAway==='home'||(m.et&&String(t.team.id)===String(m.et[0]));})[0]||teams[0],aT=teams.filter(function(t){return t!==hT;})[0];return [hT,aT];}
+function liveMkRefresh(m,path){
+  var ev=LIVE_EVT[m.id],now=Date.now();if(!ev||(LIVE_MKT[m.id]&&now-LIVE_MKT[m.id]<55000))return;LIVE_MKT[m.id]=now;
+  jget(ESPN+path+'/summary?event='+ev).then(function(j){var c=(j.header&&j.header.competitions||[])[0]||{},sd=liveSides(m,j);if(!sd)return;
+    storeLiveMk(m,liveCalc(m,c,sd[0],sd[1]));if(!overlay.classList.contains('on'))renderPicks();}).catch(function(){});
+}
+function liveProbs(m,c,hT,aT){
+  var LC=liveCalc(m,c,hT,aT),t=LC.t,out=LC.out;storeLiveMk(m,LC);
   // comparar con el pronóstico previo cuando existe el mismo mercado
   var preP={};(m.markets||[]).forEach(function(k){preP[k.n]=k.p;});
   var th=state.th,html='<h4 class="lv-team">📈 Probabilidades en vivo · min '+Math.round(t)+'\'</h4><p class="cap" style="margin:0">Se recalculan con lo que va del partido y el ritmo de juego de cada equipo (córners, remates, tarjetas, expulsiones). Se muestran las líneas que hoy superan tu umbral del '+pct(th)+'% y las más cercanas a él.</p>';
