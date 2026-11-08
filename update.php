@@ -43,6 +43,7 @@ foreach ($history as $i => $h) $histIdx[$h['id']] = $i;
 $matches = [];
 $futCodes = [];
 $futTs = [];
+$fullMk = [];
 $sportsOut = [];
 $finalScores = [];
 
@@ -93,6 +94,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             $model = model_match($sport, $R, $g);
             if (!$model) continue;
             $pick = best_pick($model['markets'], $th);
+            $fullMk[$g['id']] = $model['markets'];
             $draws = $sport['model'] === 'poisson_draw';
             $matches[] = [
                 'id' => $g['id'], 'sport' => $sportKey, 'league' => $g['league'], 'ts' => $g['ts'],
@@ -133,6 +135,24 @@ if (!empty($futCodes)) {
             $eh = club_match($m['hf'] ?: $m['home'], $futTeams[$m['lgc']]);
             $ea = club_match($m['af'] ?: $m['away'], $futTeams[$m['lgc']]);
             if ($eh && $ea && $eh !== $ea) $m['et'] = [$eh, $ea];
+            // Córners, tarjetas y remates (con las estadísticas de equipo de ESPN)
+            if (!empty($m['et']) && !empty($GLOBALS['FUT_TM'][$m['lgc']])) {
+                $extra = fut_stat_markets($m, $GLOBALS['FUT_TM'][$m['lgc']]);
+                if ($extra) {
+                    $m['markets'] = array_merge($m['markets'], array_map(fn($x) => ['n' => $x['n'], 'p' => $x['p']], $extra['markets']));
+                    $lbl = ['c' => 'Córners esperados', 'y' => 'Amarillas esperadas', 'sot' => 'Remates a portería esperados'];
+                    foreach ($lbl as $k => $l) if (isset($extra['exp'][$k])) $m['exp'][] = [$l, number_format($extra['exp'][$k][0], 1) . ' (' . number_format($extra['exp'][$k][1], 1) . ' – ' . number_format($extra['exp'][$k][2], 1) . ')'];
+                    // el pronóstico publicado puede cambiar con los mercados nuevos
+                    $pick = best_pick(array_merge($fullMk[$m['id']] ?? [], $extra['markets']), $th);
+                    if ($pick && $m['ts'] > $now) {
+                        $entry = ['id' => $m['id'], 'sport' => 'futbol', 'league' => $m['league'], 'ts' => $m['ts'],
+                            'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'r' => $pick['r'],
+                            'status' => 'pending', 'score' => null, 'mock' => $isMock, 'et' => $m['et'], 'lgc' => $m['lgc']];
+                        if (!isset($histIdx[$m['id']])) { $history[] = $entry; $histIdx[$m['id']] = count($history) - 1; }
+                        elseif ($history[$histIdx[$m['id']]]['status'] === 'pending') $history[$histIdx[$m['id']]] = $entry;
+                    }
+                }
+            }
         }
         unset($m);
     } catch (Throwable $e) { log_line('ERROR jugadores fútbol: ' . $e->getMessage()); }
@@ -140,7 +160,20 @@ if (!empty($futCodes)) {
 
 // Cierra pronósticos pendientes con resultado final
 foreach ($history as &$h) {
-    if ($h['status'] !== 'pending' || !isset($finalScores[$h['id']])) continue;
+    if ($h['status'] !== 'pending') continue;
+    // Mercados de córners/tarjetas/remates: se cierran con las estadísticas de ESPN
+    if (($h['r'][0] ?? '') === 'st') {
+        if (isset($finalScores[$h['id']]) && $finalScores[$h['id']]['status'] === 'void') { $h['status'] = 'void'; continue; }
+        $row = (!empty($h['et']) && !empty($GLOBALS['FUT_TM'][$h['lgc'] ?? ''])) ? fut_final_stats($GLOBALS['FUT_TM'][$h['lgc']], $h['et'], $h['ts']) : null;
+        $res = $row ? settle_stat($h['r'], $row) : null;
+        if ($res !== null) {
+            $h['status'] = $res ? 'ok' : 'ko';
+            $i = FUT_STAT[$h['r'][1]][0];
+            $h['score'] = $row[3][$i] . '-' . $row[4][$i] . ' ' . FUT_STAT[$h['r'][1]][1];
+        } elseif ($h['ts'] < $now - 6 * 86400) $h['status'] = 'void'; // sin dato tras 6 días: se anula
+        continue;
+    }
+    if (!isset($finalScores[$h['id']])) continue;
     $f = $finalScores[$h['id']];
     if ($f['status'] === 'void') { $h['status'] = 'void'; continue; }
     $h['status'] = settle($h['r'], $f['hs'], $f['as']) ? 'ok' : 'ko';
