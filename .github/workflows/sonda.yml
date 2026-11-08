@@ -1,0 +1,31 @@
+name: Sonda temporal (borrar)
+on: workflow_dispatch
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probar PandaScore
+        env:
+          PANDASCORE_KEY: ${{ secrets.PANDASCORE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request as u,collections
+          K=os.environ['PANDASCORE_KEY']
+          def g(p):
+            r=u.urlopen(u.Request('https://api.pandascore.co'+p,headers={'Authorization':'Bearer '+K,'Accept':'application/json'}),timeout=30)
+            return json.load(r), dict(r.headers)
+          ids=set()
+          for pg in [1,2,3]:
+            j,h=g('/csgo/matches/past?sort=-begin_at&per_page=100&page=%d'%pg)
+            print('===== page',pg,len(j),'nuevos',len({m['id'] for m in j}-ids),'Link:',(h.get('Link') or '')[:200],'X-Total:',h.get('X-Total'))
+            ids|={m['id'] for m in j}
+            print('===== status',collections.Counter((m['status'],m.get('forfeit'),bool(m.get('results')),m.get('winner_id') is not None) for m in j))
+          m=j[0]; print('===== sample', json.dumps({k:m.get(k) for k in ['id','status','forfeit','draw','winner_id','results','number_of_games','match_type','begin_at','end_at','detailed_stats','rescheduled']},ensure_ascii=False))
+          fin=[x for x in j if x['status']=='finished'][:1]
+          if fin: print('===== finished sample', json.dumps({k:fin[0].get(k) for k in ['id','status','forfeit','winner_id','results','games']},ensure_ascii=False)[:1500])
+          for kind in ['running','upcoming']:
+            j,h=g('/csgo/matches/%s?per_page=5'%kind); print('=====',kind,len(j), json.dumps([{k:x.get(k) for k in ['status','results','number_of_games','begin_at','streams_list']} for x in j[:1]],ensure_ascii=False)[:800])
+          for vg in ['lol','valorant','r6siege','ow','rl','codmw','pubg','kog','fifa','starcraft-2','mlbb']:
+            try: j,h=g('/%s/matches/upcoming?per_page=50'%vg); print('=====',vg,'upcoming',len(j))
+            except Exception as e: print('=====',vg,'ERR',e)
+          PY
