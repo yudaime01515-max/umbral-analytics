@@ -116,6 +116,17 @@ return [
                 ['code' => 'wta', 'name' => 'WTA', 'on' => true],
             ],
         ],
+        // Esports desde PandaScore (plan gratis). Se activan solos cuando existe el secreto PANDASCORE_KEY.
+        'cs2' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Counter-Strike 2', 'source' => 'pandascore', 'game' => 'csgo', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'dota2' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Dota 2', 'source' => 'pandascore', 'game' => 'dota2', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
         'beisbol' => [
             'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Béisbol', 'host' => 'https://v1.baseball.api-sports.io', 'endpoint' => 'games',

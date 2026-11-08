@@ -12,6 +12,7 @@ require "$root/lib/espn.php";
 require "$root/lib/espn_futbol.php";
 require "$root/lib/tenis.php";
 require "$root/lib/espn_ligas.php";
+require "$root/lib/esports.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -52,9 +53,11 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
     if (isset($sport['enabled']) && !$sport['enabled']) continue;
     $any = false;
     // Tenis: va por su propio camino (jugadores en vez de equipos)
-    if (($sport['source'] ?? '') === 'espn_tenis') {
-        try { $tn = tenis_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir); }
-        catch (Throwable $e) { log_line('ERROR tenis: ' . $e->getMessage()); continue; }
+    // Esports (PandaScore) va por el mismo camino que el tenis
+    if (in_array($sport['source'] ?? '', ['espn_tenis', 'pandascore'], true)) {
+        try { $tn = ($sport['source'] === 'pandascore') ? esports_run($cfg, $sport, $sportKey, $now, $startToday, $endWindow, $dataDir)
+                                                       : tenis_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir); }
+        catch (Throwable $e) { log_line("ERROR $sportKey: " . $e->getMessage()); continue; }
         foreach ($tn['final'] as $fid => $fv) $finalScores[$fid] = $fv;
         foreach ($tn['matches'] as $tm) {
             $matches[] = $tm;
@@ -192,7 +195,7 @@ usort($history, fn($a, $b) => $b['ts'] <=> $a['ts']);
 $prevPath = "$dataDir/pronosticos.json";
 if (empty($cfg['mock']) && is_file($prevPath)) {
     $prev = json_decode(file_get_contents($prevPath), true) ?: [];
-    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5];
+    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5, 'cs2' => 3.5, 'dota2' => 3.5];
     $have = array_flip(array_column($matches, 'id'));
     foreach ($prev['matches'] ?? [] as $pm) {
         if (!isset($pm['id'], $pm['ts']) || isset($have[$pm['id']])) continue;
