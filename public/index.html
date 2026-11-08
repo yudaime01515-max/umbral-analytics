@@ -1341,7 +1341,9 @@ function startApp(){
        .catch(function(){err.textContent='No se pudo verificar el acceso. Revisa tu conexión y recarga.';});
   document.getElementById('gateForm').addEventListener('submit',function(e){
     e.preventDefault();err.textContent='';
-    var code=inp.value.trim().toUpperCase().replace(/\s+/g,'');if(!code){err.textContent='Escribe tu código.';return;}
+    var code=inp.value.trim().toUpperCase().replace(/\s+/g,''),raw=code.replace(/[^A-Z0-9]/g,'');
+    // acepta el código con o sin guiones (UMB-XXXX-XXXX)
+    if(/^UMB[A-Z0-9]{8}$/.test(raw))code='UMB-'+raw.slice(3,7)+'-'+raw.slice(7);if(!code){err.textContent='Escribe tu código.';return;}
     Promise.all([listP,sha(code)]).then(function(r){if(r[0].indexOf(r[1])>=0)ok(r[1]);else{err.textContent='Código incorrecto o sin acceso.';inp.select();}})
       .catch(function(){err.textContent='No se pudo verificar. Recarga la página.';});
   });
