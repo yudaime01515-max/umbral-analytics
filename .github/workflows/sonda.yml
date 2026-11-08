@@ -1,0 +1,34 @@
+name: Sonda temporal (borrar)
+on: workflow_dispatch
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probar ESPN
+        run: |
+          B=https://site.api.espn.com/apis/site/v2/sports
+          python3 - <<'PY'
+          import json,urllib.request as u
+          B='https://site.api.espn.com/apis/site/v2/sports'
+          def g(x):
+            try: return json.load(u.urlopen(u.Request(B+x,headers={'User-Agent':'Mozilla/5.0'}),timeout=20))
+            except Exception as e: return {'ERR':str(e)}
+          def show(t,o,n=1500): print('=====',t); print(json.dumps(o,ensure_ascii=False)[:n])
+          j=g('/basketball/nba/injuries'); show('nba injuries keys',list(j.keys()))
+          inj=j.get('injuries',[]); show('nba injuries team0', inj[0] if inj else None, 2500)
+          sb=g('/basketball/nba/scoreboard'); ev=(sb.get('events') or [{}])[0].get('id')
+          s=g('/basketball/nba/summary?event=%s'%ev); show('nba summary keys',list(s.keys())); show('nba summary injuries', s.get('injuries'), 1500)
+          for lg in ['esp.1','eng.1','per.1']:
+            sb=g('/soccer/%s/scoreboard'%lg); evs=sb.get('events') or []
+            if not evs: continue
+            e=evs[0]; s=g('/soccer/%s/summary?event=%s'%(lg,e['id'])); show(lg+' summary keys',list(s.keys()))
+            for k in ['injuries','suspensions','rosters','news']:
+              if k in s: show(lg+' '+k, s[k], 1200)
+            tid=e['competitions'][0]['competitors'][0]['team']['id']
+            r=g('/soccer/%s/teams/%s/roster'%(lg,tid)); show(lg+' roster keys',list(r.keys()))
+            ath=r.get('athletes') or []
+            show(lg+' athlete0 keys', list(ath[0].keys()) if ath else None)
+            hurt=[a for a in ath if a.get('injuries') or a.get('suspensions') or (a.get('status') or {}).get('type') not in (None,'active')]
+            show(lg+' hurt', [{k:a.get(k) for k in ['displayName','injuries','suspensions','status']} for a in hurt][:4], 2500)
+            t=g('/soccer/%s/teams/%s/injuries'%(lg,tid)); show(lg+' team injuries endpoint', t, 800)
+          PY
