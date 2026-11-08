@@ -107,7 +107,7 @@ return [
                 ['code' => 'SWE', 'slug' => 'swe.1', 'src' => 'espn', 'name' => 'Allsvenskan', 'on' => true],
                 ['code' => 'NOR', 'slug' => 'nor.1', 'src' => 'espn', 'name' => 'Eliteserien', 'on' => true],
                 ['code' => 'JPN', 'slug' => 'jpn.1', 'src' => 'espn', 'name' => 'J1 League', 'on' => true],
-                ['code' => 'KOR', 'slug' => 'kor.1', 'src' => 'espn', 'name' => 'K League 1', 'on' => true],
+                ['code' => 'KOR', 'slug' => 'kor.1', 'src' => 'espn', 'name' => 'K League 1', 'on' => false],
                 ['code' => 'AUS', 'slug' => 'aus.1', 'src' => 'espn', 'name' => 'A-League', 'on' => true],
                 ['code' => 'CDR', 'slug' => 'esp.copa_del_rey', 'src' => 'espn', 'name' => 'Copa del Rey', 'on' => true],
                 ['code' => 'FAC', 'slug' => 'eng.fa', 'src' => 'espn', 'name' => 'FA Cup', 'on' => true],

@@ -25,7 +25,7 @@ jobs:
           PANDASCORE_KEY: ${{ secrets.PANDASCORE_KEY }}
           UMBRAL_DATA_DIR: public/data
           UMBRAL_CACHE_DIR: /tmp/umbral-cache
-          LIGAS_MAX_DAYS: "20"
+          LIGAS_MAX_DAYS: "150"
         run: |
           php update.php
           echo "----- registro -----"
