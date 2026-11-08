@@ -8,11 +8,14 @@
  * y, según el formato (al mejor de 1, 2, 3 o 5), la de cada marcador final.
  */
 
-function ps_get(string $path, array $q, ?int &$code = null): ?array
+function ps_get(string $path, array $q, ?int &$code = null, bool $retry = true): ?array
 {
     $key = getenv('PANDASCORE_KEY');
     if (!$key) return null;
     $url = 'https://api.pandascore.co' . $path . '?' . http_build_query($q);
+    static $last = 0.0; // pausa entre consultas: PandaScore corta si van muy seguidas
+    $wait = 0.35 - (microtime(true) - $last); if ($wait > 0) usleep((int)($wait * 1e6));
+    $last = microtime(true);
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_ENCODING => '',
@@ -22,6 +25,7 @@ function ps_get(string $path, array $q, ?int &$code = null): ?array
     $body = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+    if ($code === 429 && $retry) { sleep(8); return ps_get($path, $q, $code, false); }
     if ($body === false || $code !== 200) {
         log_line("PandaScore $path HTTP $code " . substr(preg_replace('/\s+/', ' ', (string)$body), 0, 160));
         if ($code === 401 || $code === 403) $GLOBALS['UMBRAL_ERRORS'][] = "PandaScore $code";
