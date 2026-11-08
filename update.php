@@ -143,7 +143,7 @@ if (!empty($futCodes)) {
                 $extra = fut_stat_markets($m, $GLOBALS['FUT_TM'][$m['lgc']]);
                 if ($extra) {
                     $m['markets'] = array_merge($m['markets'], array_map(fn($x) => ['n' => $x['n'], 'p' => $x['p']], $extra['markets']));
-                    $lbl = ['c' => 'Córners esperados', 'y' => 'Amarillas esperadas', 'sot' => 'Remates a portería esperados'];
+                    $lbl = ['c' => 'Córners esperados', 'y' => 'Amarillas esperadas', 'sot' => 'Remates a portería esperados', 'f' => 'Faltas esperadas'];
                     foreach ($lbl as $k => $l) if (isset($extra['exp'][$k])) $m['exp'][] = [$l, number_format($extra['exp'][$k][0], 1) . ' (' . number_format($extra['exp'][$k][1], 1) . ' – ' . number_format($extra['exp'][$k][2], 1) . ')'];
                     // el pronóstico publicado puede cambiar con los mercados nuevos
                     $pick = best_pick(array_merge($fullMk[$m['id']] ?? [], $extra['markets']), $th);

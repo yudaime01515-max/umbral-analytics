@@ -276,6 +276,7 @@ function club_match(string $name, array $teams): ?string
 /* ---------- mercados de córners, tarjetas y remates ---------- */
 const FUT_STAT = [ // clave => [índice en la fila, nombre, dispersión (más bajo = más variable)]
     'c' => [0, 'córners', 9], 'y' => [1, 'tarjetas amarillas', 6], 'sh' => [3, 'remates', 14], 'sot' => [4, 'remates a portería', 10],
+    'f' => [5, 'faltas', 20],
 ];
 
 /** Probabilidad de que una binomial negativa de media $mu supere $line (o quede debajo). */
@@ -325,8 +326,8 @@ function fut_stat_markets(array $m, array $tm): array
             $mk[] = mk('Más de ' . $line . ' ' . $name, $po, ['st', $k, 'tot', 'over', $line]);
             $mk[] = mk('Menos de ' . $line . ' ' . $name, 1 - $po, ['st', $k, 'tot', 'under', $line]);
         }
-        // por equipo (solo córners y remates a portería)
-        if ($k === 'c' || $k === 'sot') {
+        // por equipo (córners, remates a portería y faltas)
+        if ($k === 'c' || $k === 'sot' || $k === 'f') {
             foreach ([['home', $muH, $m['home']], ['away', $muA, $m['away']]] as [$side, $mus, $tn]) {
                 foreach ([-1, 0, 1] as $d) {
                     $line = floor($mus) + 0.5 + $d; if ($line < 0.5) continue;
