@@ -48,8 +48,8 @@ function ps_store(array &$db, array $m): bool
     $a = (string)$op[0]['opponent']['id']; $b = (string)$op[1]['opponent']['id'];
     $sa = 0; $sb = 0;
     foreach ($m['results'] ?? [] as $r) {
-        if ((string)($r['team_id'] ?? '') === $a) $sa = (int)$r['score'];
-        if ((string)($r['team_id'] ?? '') === $b) $sb = (int)$r['score'];
+        if ((string)($r['team_id'] ?? $r['player_id'] ?? '') === $a) $sa = (int)$r['score'];
+        if ((string)($r['team_id'] ?? $r['player_id'] ?? '') === $b) $sb = (int)$r['score'];
     }
     $st = ['finished' => 'FT', 'canceled' => 'void', 'postponed' => 'NS', 'not_started' => 'NS', 'running' => 'LIVE'][$m['status'] ?? ''] ?? 'NS';
     if ($st === 'FT' && !empty($m['forfeit'])) $st = 'void';

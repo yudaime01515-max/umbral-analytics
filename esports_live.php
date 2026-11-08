@@ -35,7 +35,7 @@ foreach (array_keys($need) as $sk) {
     foreach ($run as $r) {
         $op = $r['opponents'] ?? []; if (count($op) !== 2) continue;
         $a = (string)$op[0]['opponent']['id']; $b = (string)$op[1]['opponent']['id']; $sa = 0; $sb = 0;
-        foreach ($r['results'] ?? [] as $x) { if ((string)$x['team_id'] === $a) $sa = (int)$x['score']; if ((string)$x['team_id'] === $b) $sb = (int)$x['score']; }
+        foreach ($r['results'] ?? [] as $x) { if ((string)($x['team_id'] ?? $x['player_id'] ?? '') === $a) $sa = (int)$x['score']; if ((string)($x['team_id'] ?? $x['player_id'] ?? '') === $b) $sb = (int)$x['score']; }
         $byId["$sk-ps-" . $r['id']] = [$sa, $sb];
     }
     foreach ($data['matches'] as &$m) {
