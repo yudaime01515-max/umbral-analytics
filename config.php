@@ -127,6 +127,36 @@ return [
             'name' => 'Dota 2', 'source' => 'pandascore', 'game' => 'dota2', 'unit' => 'mapas',
             'leagues' => [],
         ],
+        'lol' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'League of Legends', 'source' => 'pandascore', 'game' => 'lol', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'valorant' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Valorant', 'source' => 'pandascore', 'game' => 'valorant', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'r6' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Rainbow Six Siege', 'source' => 'pandascore', 'game' => 'r6siege', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'ow' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Overwatch 2', 'source' => 'pandascore', 'game' => 'ow', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'mlbb' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'Mobile Legends', 'source' => 'pandascore', 'game' => 'mlbb', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
+        'sc2' => [
+            'enabled' => (bool)getenv('PANDASCORE_KEY'),
+            'name' => 'StarCraft II', 'source' => 'pandascore', 'game' => 'starcraft-2', 'unit' => 'mapas',
+            'leagues' => [],
+        ],
         'beisbol' => [
             'enabled' => !$fdKey || $apiSportsPaid,
             'name' => 'Béisbol', 'host' => 'https://v1.baseball.api-sports.io', 'endpoint' => 'games',

@@ -195,7 +195,7 @@ usort($history, fn($a, $b) => $b['ts'] <=> $a['ts']);
 $prevPath = "$dataDir/pronosticos.json";
 if (empty($cfg['mock']) && is_file($prevPath)) {
     $prev = json_decode(file_get_contents($prevPath), true) ?: [];
-    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5, 'cs2' => 3.5, 'dota2' => 3.5];
+    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5]; // esports: se recalculan solos en cada actualización
     $have = array_flip(array_column($matches, 'id'));
     foreach ($prev['matches'] ?? [] as $pm) {
         if (!isset($pm['id'], $pm['ts']) || isset($have[$pm['id']])) continue;

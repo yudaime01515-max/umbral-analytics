@@ -1,0 +1,37 @@
+name: Esports en vivo
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  vivo:
+    runs-on: ubuntu-latest
+    env:
+      PANDASCORE_KEY: ${{ secrets.PANDASCORE_KEY }}
+      UMBRAL_DATA_DIR: public/data
+      UMBRAL_CACHE_DIR: /tmp/umbral-cache
+    steps:
+      - uses: actions/checkout@v4
+      - name: Marcadores de esports en juego y guardar
+        run: |
+          git config user.name "umbral-bot"
+          git config user.email "umbral-bot@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            php esports_live.php
+            git diff --quiet -- public/data && { echo "Sin cambios"; exit 0; }
+            git add public/data
+            git commit -q -m "Esports en vivo"
+            git push -q origin HEAD:main && exit 0
+            echo "Otro guardado se cruzó, reintento $i"; sleep 5
+          done
+          exit 1
