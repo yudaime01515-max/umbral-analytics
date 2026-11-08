@@ -272,6 +272,11 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 .lv-row i{display:block;height:6px;border-radius:4px;background:#5B6B8F;overflow:hidden}
 .lv-row em{display:block;height:100%;background:var(--accent)}
 .lv-team{margin:6px 0 0;display:flex;align-items:center;gap:8px;font-size:15px}
+.lv-grp{margin-top:6px}
+.lv-gt{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.lv-gt small{color:var(--muted);font-size:12px}
+.lv-d{font-size:11px;color:var(--muted);white-space:nowrap}
+.lv-d.up{color:#3CCB7F}.lv-d.dn{color:#F0616D}
 .lv-st{font-family:var(--mono);color:var(--accent);font-size:10px}
 .lv-ev{display:grid;gap:6px}
 .lv-ev div{display:grid;grid-template-columns:46px 24px 1fr;gap:6px;align-items:center;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}
@@ -1089,6 +1094,72 @@ function liveNBA(m,j){
   });
   return html;
 }
+/* ---------- probabilidades en vivo (fútbol) ----------
+   Lo que ya pasó + lo que se espera en los minutos que faltan.
+   El ritmo esperado mezcla el pronóstico previo con el ritmo real del partido:
+   cuanto más avanza el partido, más pesa lo que se está viendo en la cancha. */
+function pois(l,K){var a=[],p=Math.exp(-l);for(var k=0;k<=K;k++){a.push(p);p*=l/(k+1);}return a;}
+function pOverRem(need,l){if(need<=0)return 1;var a=pois(l,need),s=0;for(var k=0;k<need;k++)s+=a[k];return Math.max(0,1-s);} // P(X>=need)
+function expNums(m,re){for(var i=0;i<(m.exp||[]).length;i++)if(re.test(m.exp[i][0])){var n=(String(m.exp[i][1]).match(/\d+(\.\d+)?/g)||[]).map(parseFloat);return n;}return null;}
+function lineMean(m,re){ // media aproximada a partir de las líneas "Más de X" del pronóstico previo
+  var best=null;(m.markets||[]).forEach(function(k){var mm=k.n.match(/^Más de (\d+\.5) (.+)$/);if(mm&&re.test(mm[2])&&!/:/.test(k.n)){var d=Math.abs(k.p-0.5);if(!best||d<best.d)best={d:d,v:parseFloat(mm[1])+(k.p-0.5)*4};}});return best?Math.max(1,best.v):null;}
+function liveMinute(c){
+  var st=c.status||{},t=st.type||{},name=String(t.name||''),dc=String(st.displayClock||'');
+  if(/HALFTIME/.test(name))return 45;
+  var mn=dc.match(/^(\d+)'?\s*(\+\s*(\d+))?/);
+  if(mn)return Math.min(95,parseInt(mn[1],10)+(mn[3]?parseInt(mn[3],10):0));
+  if(st.clock)return Math.min(95,st.clock/60);
+  return (st.period||1)>1?60:20;
+}
+function liveProbs(m,c,hT,aT){
+  var num=function(T,k){var v=statVal(T.statistics,k);return v==null?0:(parseFloat(v)||0);};
+  var t=Math.max(1,liveMinute(c)),R=Math.max(1,96-t),w=t/(t+35);
+  var sc=scoreOf(m,c),gh=parseInt(sc.hs,10)||0,ga=parseInt(sc.as,10)||0;
+  var cur={c:[num(hT,['wonCorners']),num(aT,['wonCorners'])],y:[num(hT,['yellowCards']),num(aT,['yellowCards'])],
+           sot:[num(hT,['shotsOnTarget']),num(aT,['shotsOnTarget'])],sh:[num(hT,['totalShots']),num(aT,['totalShots'])],
+           r:[num(hT,['redCards']),num(aT,['redCards'])]};
+  // pronóstico previo por equipo (partido completo)
+  var g=[0,0],gx=(m.exp||[]).filter(function(e){return /^Goles esperados/.test(e[0]);});if(gx.length===2){g=[parseFloat(gx[0][1])||1.3,parseFloat(gx[1][1])||1.1];}else g=[1.4,1.1];
+  var split=function(re,dflt){var n=expNums(m,re);if(n&&n.length>=3)return [n[1],n[2]];if(n&&n.length)return [n[0]/2,n[0]/2];var lm=lineMean(m,dflt||re);return lm?[lm/2,lm/2]:null;};
+  var pre={c:split(/Córners/i,/córners/)||[5,4.5],y:split(/Amarillas/i,/amarillas/)||[2,2],sot:split(/portería/i,/remates a portería/)||[4.5,3.8]};
+  var shm=lineMean(m,/^remates$/);pre.sh=shm?[shm*pre.sot[0]/(pre.sot[0]+pre.sot[1]),shm*pre.sot[1]/(pre.sot[0]+pre.sot[1])]:[pre.sot[0]*2.9,pre.sot[1]*2.9];
+  // expulsiones: el equipo con uno menos ataca menos y el rival más
+  var att=[1,1];if(cur.r[0]>cur.r[1]){att=[0.75,1.2];}else if(cur.r[1]>cur.r[0]){att=[1.2,0.75];}
+  var rem=function(key,i){var preR=pre[key][i]/95,obsR=cur[key][i]/t,r=(1-w)*preR+w*obsR;if(key!=='y')r*=att[i];return r*R;};
+  var L={};['c','y','sot','sh'].forEach(function(k){L[k]=[rem(k,0),rem(k,1)];});
+  // goles: ritmo previo + presión real (remates a portería convertidos con la eficacia esperada de cada equipo)
+  L.g=[0,1].map(function(i){var conv=pre.sot[i]>0?g[i]/pre.sot[i]:0.3;conv=Math.max(0.18,Math.min(0.45,conv));
+    var preR=g[i]/95,obsR=(cur.sot[i]/t)*conv;return ((1-w)*preR+w*obsR)*att[i]*R;});
+  var out=[];
+  // resultado final
+  var ph=pois(L.g[0],12),pa=pois(L.g[1],12),pH=0,pD=0,pA=0,pT={},pB=0;
+  for(var i=0;i<=12;i++)for(var j=0;j<=12;j++){var p=ph[i]*pa[j],fh=gh+i,fa=ga+j;if(fh>fa)pH+=p;else if(fh===fa)pD+=p;else pA+=p;pT[fh+fa]=(pT[fh+fa]||0)+p;if(fh>0&&fa>0)pB+=p;}
+  var tot=gh+ga,over=function(line){var s2=0;for(var k in pT)if(+k>line)s2+=pT[k];return s2;};
+  var res=[['Gana '+m.home,pH],['Empate',pD],['Gana '+m.away,pA],[m.home+' o empate',pH+pD],[m.away+' o empate',pA+pD],['Ambos marcan: sí',pB],['Ambos marcan: no',1-pB]];
+  for(var ln=tot+0.5;ln<=tot+3.5;ln++){res.push(['Más de '+ln+' goles',over(ln)]);res.push(['Menos de '+ln+' goles',1-over(ln)]);}
+  out.push({t:'Resultado y goles',sub:'Van '+gh+'–'+ga+' · goles esperados en lo que falta: '+L.g[0].toFixed(2)+' – '+L.g[1].toFixed(2),rows:res});
+  // totales y por equipo
+  var stat=function(k,label,unit){
+    var c0=cur[k][0]+cur[k][1],lam=L[k][0]+L[k][1],proj=c0+lam,rows=[];
+    var lo=Math.floor(c0)+0.5,hi=Math.ceil(proj+5)+0.5;
+    for(var ln2=lo;ln2<=hi;ln2++){var po=pOverRem(Math.ceil(ln2-c0),lam);rows.push(['Más de '+ln2+' '+unit,po]);rows.push(['Menos de '+ln2+' '+unit,1-po]);}
+    [0,1].forEach(function(s){var nm=s?m.away:m.home,cc=cur[k][s];for(var l3=Math.floor(cc)+0.5;l3<=cc+Math.ceil(L[k][s]+3);l3++)rows.push([nm+': más de '+l3+' '+unit,pOverRem(Math.ceil(l3-cc),L[k][s])]);});
+    out.push({t:label,sub:'Van '+c0+' ('+cur[k][0]+' – '+cur[k][1]+') · proyección al final: '+proj.toFixed(1),rows:rows});
+  };
+  stat('c','Córners','córners');stat('y','Tarjetas amarillas','tarjetas amarillas');stat('sot','Remates a portería','remates a portería');stat('sh','Remates','remates');
+  // comparar con el pronóstico previo cuando existe el mismo mercado
+  var preP={};(m.markets||[]).forEach(function(k){preP[k.n]=k.p;});
+  var th=state.th,html='<h4 class="lv-team">📈 Probabilidades en vivo · min '+Math.round(t)+'\'</h4><p class="cap" style="margin:0">Se recalculan con lo que va del partido y el ritmo de juego de cada equipo (córners, remates, tarjetas, expulsiones). Se muestran las líneas que hoy superan tu umbral del '+pct(th)+'% y las más cercanas a él.</p>';
+  out.forEach(function(gp){
+    var rows=gp.rows.filter(function(r){return r[1]<0.995;}).sort(function(a,b){return b[1]-a[1];});
+    var above=rows.filter(function(r){return r[1]>=th&&r[1]<0.97;}).slice(-5),near=rows.filter(function(r){return r[1]<th;}).slice(0,2);
+    var show=above.concat(near);if(!show.length)return;
+    html+='<div class="lv-grp"><div class="lv-gt"><b>'+esc(gp.t)+'</b><small>'+esc(gp.sub)+'</small></div>'+show.map(function(r){
+      var was=preP[r[0]],d=was!=null?r[1]-was:null,arr=d==null?'':(Math.abs(d)<0.02?'<small class="lv-d">=</small>':'<small class="lv-d '+(d>0?'up':'dn')+'">'+(d>0?'▲':'▼')+' antes '+pct(was)+'%</small>');
+      return '<div class="mk-row'+(r[1]>=th?' above':'')+'"><span>'+esc(r[0])+' '+arr+'</span><div class="bar"><i style="width:'+(r[1]*100).toFixed(1)+'%;background:'+(r[1]>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(r[1]*100).toFixed(1)+'%</span><span class="fo">'+fair(Math.max(r[1],0.001))+'</span></div>';}).join('')+'</div>';
+  });
+  return html;
+}
 function liveSoccer(m,j){
   var c=(j.header&&j.header.competitions||[])[0]||{},st=evStatus(c.status),html=liveHead(m,c,st);
   var teams=(j.boxscore&&j.boxscore.teams)||[];
@@ -1098,6 +1169,7 @@ function liveSoccer(m,j){
     html+='<div class="lv-stats">'+rows.map(function(r){var a=statVal(hT.statistics,r[1]),b=statVal(aT.statistics,r[1]);if(a==null&&b==null)return '';
       var na=parseFloat(a)||0,nb=parseFloat(b)||0,tot=na+nb||1;
       return '<div class="lv-row"><b>'+esc(String(a==null?'0':a))+'</b><span>'+r[0]+'<i><em style="width:'+(na/tot*100)+'%"></em></i></span><b>'+esc(String(b==null?'0':b))+'</b></div>';}).join('')+'</div>';
+    if(st.state==='in')html+=liveProbs(m,c,hT,aT);
   }
   var ke=(j.keyEvents||[]).filter(function(e){var t=((e.type||{}).text||'').toLowerCase();return /goal|gol|card|tarjeta|substitution|cambio|penalty/.test(t);});
   if(ke.length){
