@@ -239,3 +239,48 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
     rename("$path.tmp", $path);
     log_line("OK jugadores NBA: $ok planillas nuevas" . ($fail ? ", $fail sin datos" : '') . ', ' . count($db['players']) . ' jugadores');
 }
+
+
+/**
+ * Mercados de jugadores para un partido NBA. Usa los 5 jugadores con más puntos de cada equipo
+ * (mínimo 20 minutos de promedio). La probabilidad mezcla cuántas veces superó la línea en sus
+ * últimos 10 partidos con una curva normal alrededor de su promedio (para no fiarse de pocos partidos).
+ */
+function nba_props(array $m, array $db): array
+{
+    $players = $db['players'] ?? []; $out = [];
+    $stats = [['puntos', fn($g) => $g[4]], ['rebotes', fn($g) => $g[5]], ['asistencias', fn($g) => $g[6]],
+              ['triples', fn($g) => $g[7]], ['PTS+REB+AST', fn($g) => $g[4] + $g[5] + $g[6]]];
+    foreach ([(string)($m['hid'] ?? ''), (string)($m['aid'] ?? '')] as $tid) {
+        if ($tid === '') continue;
+        $cand = [];
+        foreach ($players as $pid => $p) {
+            if ((string)($p['t'] ?? '') !== $tid) continue;
+            $h = array_values(array_filter($p['h'] ?? [], fn($g) => $g[3] >= 8 && $g[0] < $m['ts']));
+            usort($h, fn($a, $b) => $b[0] <=> $a[0]); $h = array_slice($h, 0, 10);
+            if (count($h) < 4) continue;
+            $min = array_sum(array_column($h, 3)) / count($h);
+            if ($min < 20) continue;
+            $cand[] = [$pid, $p['n'], $h, array_sum(array_column($h, 4)) / count($h)];
+        }
+        usort($cand, fn($a, $b) => $b[3] <=> $a[3]);
+        foreach (array_slice($cand, 0, 5) as [$pid, $name, $h]) {
+            foreach ($stats as [$sn, $f]) {
+                $v = array_map($f, $h); $n = count($v); $mu = array_sum($v) / $n;
+                if ($mu < 1.2) continue; // estadísticas casi en cero no tienen línea útil
+                $var = 0; foreach ($v as $x) $var += ($x - $mu) ** 2; $sd = max(sqrt($var / max(1, $n - 1)), sqrt($mu) * 1.1, 1.0);
+                $base = floor($mu) + 0.5; $step = $mu >= 15 ? 3 : ($mu >= 6 ? 2 : 1);
+                foreach ([-$step, 0, $step] as $d) {
+                    $L = $base + $d; if ($L < 0.5) continue;
+                    $emp = count(array_filter($v, fn($x) => $x > $L)) / $n;
+                    $nrm = 1 - ncdf($L, $mu, $sd);
+                    $w = $n / ($n + 6); // con 10 partidos, ~60% pesa lo que pasó y ~40% la curva
+                    $po = clampf($w * $emp + (1 - $w) * $nrm, 0.03, 0.97);
+                    $out[] = ['n' => "$name: más de $L $sn", 'p' => round($po, 4)];
+                    if ($d === 0) $out[] = ['n' => "$name: menos de $L $sn", 'p' => round(1 - $po, 4)];
+                }
+            }
+        }
+    }
+    return $out;
+}

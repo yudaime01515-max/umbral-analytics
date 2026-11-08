@@ -131,7 +131,7 @@ return [
             'source' => $apiSportsPaid ? 'apisports' : (($envKey || $fdKey || $bdlKey) ? (getenv('NBA_SOURCE') ?: 'espn') : 'apisports'),
             'players' => true, // estadísticas de jugadores (solo con ESPN)
             'name' => 'Básquet', 'host' => 'https://v1.basketball.api-sports.io', 'endpoint' => 'games',
-            'model' => 'normal', 'sd' => 12.5, 'tsd' => 17, 'alt' => 7, 'talt' => 13, 'home' => 2.5,
+            'model' => 'normal', 'sd' => 12.5, 'tsd' => 17, 'alt' => 7, 'talt' => 13, 'home' => 2.5, 'periods' => true,
             'leagues' => ($apiSportsPaid || !($envKey || $fdKey || $bdlKey)) ? [
                 ['id' => 12, 'season' => '2026-2027', 'name' => 'NBA', 'on' => true],
             ] : [

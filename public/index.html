@@ -573,6 +573,7 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
       <div>
         <h3 style="font-size:18px;margin-bottom:4px">Todos los mercados</h3>
         <p style="color:var(--muted);font-size:14px;margin:0 0 8px">La línea blanca marca el umbral. En naranja, los que se publicarían.</p>
+        <div id="dMkTabs" class="seg" role="group" aria-label="Tipo de mercado" style="margin-bottom:8px" hidden></div>
         <div class="mk-row mk-head"><span>Mercado</span><span></span><span style="text-align:right">Prob.</span><span style="text-align:right">Cuota justa</span></div>
         <div id="dMarkets"></div>
       </div>
@@ -720,12 +721,38 @@ function openDetail(id){
   var facts=f.exp.map(function(e){return '<div><div class="k">'+esc(e[0])+'</div><div class="v num">'+esc(e[1])+'</div></div>';}).join('');
   facts+='<div><div class="k">Pronóstico publicado</div><div class="v" style="font-size:20px;line-height:1.25;padding-top:4px">'+(best?esc(best.market.n)+' · '+pct(best.market.p)+'%':'Ninguno sobre '+pct(th)+'%')+'</div></div>';
   document.getElementById('dFacts').innerHTML=facts;
-  var mk=f.markets.slice().sort(function(a,b){return b.p-a.p;});
-  document.getElementById('dMarkets').innerHTML=mk.map(function(m){return '<div class="mk-row'+(m.p>=th?' above':'')+'"><span>'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%;background:'+(m.p>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(m.p*100).toFixed(1)+'%</span><span class="fo">'+fair(m.p)+'</span></div>';}).join('');
+  MK_F=f;MK_TAB=null;drawMarkets();
   renderDist(f.dist,f);
   CUR_DETAIL=f.id;renderKeyPlayers(f);renderInjuries(f);startLiveDetail(f);
   lastFocus=document.activeElement;overlay.classList.add('on');document.getElementById('dClose').focus();document.body.style.overflow='hidden';
 }
+/* ---------- pestañas de mercados (para no perderse cuando hay cientos) ---------- */
+var MK_F=null,MK_TAB=null;
+function mkGroup(f,n){
+  if(f.sport==='basquet'){
+    if(/^\d\.(ª|er|º) cuarto:/.test(n))return 'Cuartos';
+    if(/mitad:/.test(n))return 'Mitades';
+    if(n.indexOf(f.home+':')===0||n.indexOf(f.away+':')===0)return 'Equipos';
+    if(/: (más|menos) de [\d.]+ (puntos|rebotes|asistencias|triples|PTS\+REB\+AST)$/.test(n))return 'Jugadores';
+    return 'Partido';
+  }
+  if(f.sport==='futbol'){
+    if(/córners/.test(n))return 'Córners';if(/tarjetas/.test(n))return 'Tarjetas';if(/faltas/.test(n))return 'Faltas';if(/remates/.test(n))return 'Remates';
+    return 'Resultado y goles';
+  }
+  return 'Todos';
+}
+function drawMarkets(){
+  var f=MK_F,th=state.th,groups=[],by={};
+  f.markets.forEach(function(m){var g=mkGroup(f,m.n);if(!by[g]){by[g]=[];groups.push(g);}by[g].push(m);});
+  var tabs=document.getElementById('dMkTabs');
+  if(groups.length>1){if(!MK_TAB||!by[MK_TAB])MK_TAB=groups[0];
+    tabs.innerHTML=groups.map(function(g){return '<button data-g="'+esc(g)+'" aria-pressed="'+(g===MK_TAB)+'">'+esc(g)+' <span class="count num">'+by[g].length+'</span></button>';}).join('');tabs.hidden=false;}
+  else{MK_TAB=groups[0];tabs.hidden=true;tabs.innerHTML='';}
+  var mk=(by[MK_TAB]||[]).slice().sort(function(a,b){return b.p-a.p;});
+  document.getElementById('dMarkets').innerHTML=mk.map(function(m){return '<div class="mk-row'+(m.p>=th?' above':'')+'"><span>'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%;background:'+(m.p>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(m.p*100).toFixed(1)+'%</span><span class="fo">'+fair(m.p)+'</span></div>';}).join('');
+}
+document.getElementById('dMkTabs').addEventListener('click',function(e){var b=e.target.closest('[data-g]');if(!b)return;MK_TAB=b.dataset.g;drawMarkets();});
 function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
 function renderDist(d,f){
   var el=document.getElementById('dDist'),t=document.getElementById('dDistTitle'),c=document.getElementById('dDistCap');

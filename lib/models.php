@@ -165,15 +165,60 @@ function model_normal(float $ph, float $pa, string $H, string $A, array $sport):
     return [
         'exp' => [["Margen esperado ($H)", ($mean > 0 ? '+' : '') . number_format($mean, 1)], ['Total esperado', number_format($tmean, 0) . ' pts']],
         'dist' => ['kind' => 'bars', 'title' => "Diferencia de puntos a favor de $H", 'data' => $bins, 'mark' => null],
-        'markets' => [
+        'markets' => array_merge([
             mk("Gana $H", $pH, ['res', 'home']), mk("Gana $A", 1 - $pH, ['res', 'away']),
             mk("$fav -$Lf", 1 - ncdf($Lf, $m, $sd), ['hcp', $favSide, -$Lf]),
             mk("$dog +$Ld", ncdf($Ld, $m, $sd), ['hcp', $dogSide, $Ld]),
             mk("Más de $To puntos", 1 - ncdf($To, $tmean, $tsd), ['tot', 'over', $To]),
             mk("Menos de $Tu puntos", ncdf($Tu, $tmean, $tsd), ['tot', 'under', $Tu]),
             mk('Más de ' . ($T + 0.5) . ' puntos', 1 - ncdf($T + 0.5, $tmean, $tsd), ['tot', 'over', $T + 0.5]),
-        ],
+        ], empty($sport['periods']) ? [] : model_basket_extra($ph, $pa, $mean, $tmean, $H, $A, $sport)),
     ];
+}
+
+/** NBA: más líneas del partido, puntos de cada equipo, mitades y cuartos. */
+function model_basket_extra(float $ph, float $pa, float $mean, float $tmean, string $H, string $A, array $sport): array
+{
+    $sd = $sport['sd']; $tsd = $sport['tsd']; $out = [];
+    $fav = $mean >= 0 ? $H : $A; $favSide = $mean >= 0 ? 'home' : 'away'; $dog = $mean >= 0 ? $A : $H; $dogSide = $mean >= 0 ? 'away' : 'home'; $m = abs($mean);
+    // hándicaps y totales en escalera
+    foreach ([-6, -3, 0, 3, 6] as $d) {
+        $L = max(0.5, round($m) + $d + 0.5);
+        $out[] = mk("$fav -$L", 1 - ncdf($L, $m, $sd), ['hcp', $favSide, -$L]);
+        $out[] = mk("$dog +$L", ncdf($L, $m, $sd), ['hcp', $dogSide, $L]);
+    }
+    $T = round($tmean);
+    foreach ([-15, -10, -5, 5, 10, 15] as $d) {
+        $L = $T + $d + 0.5;
+        $out[] = mk("Más de $L puntos", 1 - ncdf($L, $tmean, $tsd), ['tot', 'over', $L]);
+        $out[] = mk("Menos de $L puntos", ncdf($L, $tmean, $tsd), ['tot', 'under', $L]);
+    }
+    // puntos de cada equipo
+    foreach ([[$H, $ph + ($sport['home'] ?? 0) * 0.25, 'home'], [$A, $pa - ($sport['home'] ?? 0) * 0.25, 'away']] as [$tn, $mu, $side]) {
+        foreach ([-8, -4, 0, 4, 8] as $d) {
+            $L = round($mu) + $d + 0.5; $po = 1 - ncdf($L, $mu, $tsd * 0.62);
+            $out[] = mk("$tn: más de $L puntos", $po, ['tt', $side, 'over', $L]);
+            $out[] = mk("$tn: menos de $L puntos", 1 - $po, ['tt', $side, 'under', $L]);
+        }
+    }
+    // mitades y cuartos: [nombre, parte del partido, desvío del margen, desvío del total]
+    $per = [['1.ª mitad', 'h1', 0.505, 8.6, 11.5], ['2.ª mitad', 'h2', 0.495, 8.8, 12],
+            ['1.er cuarto', 'q1', 0.253, 6.1, 7.6], ['2.º cuarto', 'q2', 0.251, 6.1, 7.6], ['3.er cuarto', 'q3', 0.250, 6.1, 7.6], ['4.º cuarto', 'q4', 0.246, 6.4, 8]];
+    foreach ($per as [$pn, $pk, $f, $psd, $ptsd]) {
+        $pm = $mean * $f; $pt = $tmean * $f;
+        $pH = 1 - ncdf(0.5, $pm, $psd); $pA = ncdf(-0.5, $pm, $psd);
+        $out[] = mk("$pn: gana $H", $pH, ['per', $pk, 'res', 'home']);
+        $out[] = mk("$pn: gana $A", $pA, ['per', $pk, 'res', 'away']);
+        $L = max(0.5, round(abs($pm)) + 0.5); $pf = $pm >= 0 ? $H : $A;
+        $out[] = mk("$pn: $pf -$L", 1 - ncdf($L, abs($pm), $psd), ['per', $pk, 'hcp', $pm >= 0 ? 'home' : 'away', -$L]);
+        $out[] = mk("$pn: " . ($pm >= 0 ? $A : $H) . " +$L", ncdf($L, abs($pm), $psd), ['per', $pk, 'hcp', $pm >= 0 ? 'away' : 'home', $L]);
+        foreach ([-4, 0, 4] as $d) {
+            $L = round($pt) + $d + 0.5;
+            $out[] = mk("$pn: más de $L puntos", 1 - ncdf($L, $pt, $ptsd), ['per', $pk, 'tot', 'over', $L]);
+            $out[] = mk("$pn: menos de $L puntos", ncdf($L, $pt, $ptsd), ['per', $pk, 'tot', 'under', $L]);
+        }
+    }
+    return $out;
 }
 
 function model_sets(array $th, array $ta, array $R, string $H, string $A): array
@@ -208,6 +253,7 @@ function settle(array $rule, int $hs, int $as): bool
         case 'tscore':return $rule[1] === 'home' ? $hs > 0 : $as > 0;
         case 'hcp':   return $rule[1] === 'home' ? ($hs - $as + $rule[2]) > 0 : ($as - $hs + $rule[2]) > 0;
         case 'sets_one': return $rule[1] === 'home' ? $hs >= 1 : $as >= 1;
+        case 'tt':    $v = $rule[1] === 'home' ? $hs : $as; return $rule[2] === 'over' ? $v > $rule[3] : $v < $rule[3];
     }
     return false;
 }
@@ -215,7 +261,7 @@ function settle(array $rule, int $hs, int $as): bool
 /** Mercado publicado: el de menor probabilidad que aún supera el umbral (es el que paga mejor). */
 function best_pick(array $markets, float $th): ?array
 {
-    $above = array_values(array_filter($markets, fn($m) => $m['p'] >= $th));
+    $above = array_values(array_filter($markets, fn($m) => $m['p'] >= $th && !in_array($m['r'][0] ?? '', ['per', 'pp'], true)));
     if (!$above) return null;
     usort($above, fn($a, $b) => $a['p'] <=> $b['p']);
     return $above[0];

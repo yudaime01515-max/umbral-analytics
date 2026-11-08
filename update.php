@@ -111,7 +111,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 'lgc' => $league['code'] ?? null, 'hf' => $g['home_full'] ?? '', 'af' => $g['away_full'] ?? '',
                 'formH' => recent_form($finished, $g['home_id'], $draws), 'formA' => recent_form($finished, $g['away_id'], $draws),
                 'exp' => $model['exp'], 'dist' => $model['dist'],
-                'markets' => array_map(fn($m) => ['n' => $m['n'], 'p' => $m['p']], $model['markets']),
+                'markets' => array_values(array_column(array_map(fn($m) => ['n' => $m['n'], 'p' => $m['p']], $model['markets']), null, 'n')),
             ];
             // Guarda en el historial el pronóstico publicado, solo antes de que empiece el partido
             if ($pick && $g['ts'] > $now) {
@@ -132,6 +132,20 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
 if (!empty($nbaEvents)) {
     try { nba_players_update($cfg, $nbaEvents, $dataDir); }
     catch (Throwable $e) { log_line('ERROR jugadores NBA: ' . $e->getMessage()); }
+}
+// Mercados de jugadores NBA (puntos, rebotes, asistencias, triples, PTS+REB+AST) con sus últimos 10 partidos
+if (is_file("$dataDir/nba.json")) {
+    try {
+        $nbaDb = json_decode(file_get_contents("$dataDir/nba.json"), true) ?: [];
+        $np = 0;
+        foreach ($matches as &$m) {
+            if ($m['sport'] !== 'basquet') continue;
+            $props = nba_props($m, $nbaDb);
+            if ($props) { $m['markets'] = array_merge($m['markets'], $props); $np += count($props); }
+        }
+        unset($m);
+        log_line("OK props NBA: $np mercados de jugadores");
+    } catch (Throwable $e) { log_line('ERROR props NBA: ' . $e->getMessage()); }
 }
 
 // Estadísticas de jugadores de fútbol (ESPN) y enlace de cada partido con sus equipos
