@@ -244,6 +244,11 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 .p-tiles .l5 b.up{color:var(--good)}.p-tiles .l5 b.dn{color:var(--bad)}
 .key-pl{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 .key-pl h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;font-size:15px}
+#dInj{margin-top:18px}
+.inj{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.inj .n{font-weight:600}.inj .s{grid-column:2;color:var(--muted);font-size:12px}
+.inj-st{grid-row:span 2;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.inj-st.out{background:rgba(240,97,109,.16);color:#F0616D}.inj-st.dud{background:rgba(240,180,60,.16);color:#F0B43C}.inj-st.ok{background:rgba(60,203,127,.16);color:#3CCB7F}
 .kp{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border:0;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer;background:none;width:100%;color:var(--text);text-align:left}
 .kp:last-child{border-bottom:0}
 .kp:hover .n{color:var(--accent)}
@@ -562,6 +567,7 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
       <div id="dLive" class="lv" hidden></div>
       <div class="d-facts" id="dFacts"></div>
       <div id="dPlayers" hidden></div>
+      <div id="dInj" hidden></div>
       <div>
         <h3 style="font-size:18px;margin-bottom:4px">Todos los mercados</h3>
         <p style="color:var(--muted);font-size:14px;margin:0 0 8px">La línea blanca marca el umbral. En naranja, los que se publicarían.</p>
@@ -709,7 +715,7 @@ function openDetail(id){
   var mk=f.markets.slice().sort(function(a,b){return b.p-a.p;});
   document.getElementById('dMarkets').innerHTML=mk.map(function(m){return '<div class="mk-row'+(m.p>=th?' above':'')+'"><span>'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%;background:'+(m.p>=th?'var(--accent)':'#4A5878')+'"></i><span class="th" style="left:'+(th*100)+'%"></span></div><span class="pp">'+(m.p*100).toFixed(1)+'%</span><span class="fo">'+fair(m.p)+'</span></div>';}).join('');
   renderDist(f.dist,f);
-  CUR_DETAIL=f.id;renderKeyPlayers(f);startLiveDetail(f);
+  CUR_DETAIL=f.id;renderKeyPlayers(f);renderInjuries(f);startLiveDetail(f);
   lastFocus=document.activeElement;overlay.classList.add('on');document.getElementById('dClose').focus();document.body.style.overflow='hidden';
 }
 function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
@@ -1012,6 +1018,33 @@ function renderKeyPlayers(f){
     box.hidden=false;});
 }
 
+/* ---------- bajas y lesionados (NBA, desde ESPN) ---------- */
+var INJ_ST={'Out':['No juega','out'],'Day-To-Day':['Duda · día a día','dud'],'Questionable':['Duda','dud'],'Doubtful':['Poco probable','dud'],'Probable':['Probable que juegue','ok'],'Suspension':['Suspendido','out'],'Out For Season':['Fuera toda la temporada','out']};
+var INJ_PART={Knee:'Rodilla',Ankle:'Tobillo',Hamstring:'Isquiotibial',Back:'Espalda',Foot:'Pie',Hip:'Cadera',Shoulder:'Hombro',Calf:'Pantorrilla',Wrist:'Muñeca',Hand:'Mano',Groin:'Ingle',Illness:'Enfermedad',Rest:'Descanso',Toe:'Dedo del pie',Thumb:'Pulgar',Finger:'Dedo',Achilles:'Tendón de Aquiles',Concussion:'Conmoción',Elbow:'Codo',Quadriceps:'Cuádriceps',Personal:'Motivos personales','Not Injury Related':'No es lesión',Leg:'Pierna',Neck:'Cuello',Abdomen:'Abdomen',Oblique:'Oblicuo',Chest:'Pecho',Face:'Cara',Eye:'Ojo',Nose:'Nariz',Head:'Cabeza',Shin:'Tibia',Heel:'Talón',Lower:'Pierna',Ribs:'Costillas'};
+function injReason(i){var d=i.details||{},t=d.type||d.detail||(i.type&&i.type.description)||'';
+  if(!t&&i.shortComment){var mm=String(i.shortComment).match(/\(([^)]+)\)/);if(mm)t=mm[1];}
+  t=String(t);var k=t.charAt(0).toUpperCase()+t.slice(1);var es=INJ_PART[k]||t;
+  if(d.side&&/left|right/i.test(d.side))es+=' '+(/left/i.test(d.side)?'izq.':'der.');
+  if(d.returnDate){var rd=new Date(d.returnDate);if(!isNaN(rd))es+=(es?' · ':'')+'vuelta aprox. '+rd.toLocaleDateString('es-PE',{day:'numeric',month:'short'});}
+  return es;}
+function renderInjuries(f){
+  var box=document.getElementById('dInj');box.hidden=true;box.innerHTML='';
+  if(f.sport!=='basquet'||f.hid==null)return;
+  var fid=f.id,eid=String(f.id).replace('basquet-espn-','');
+  var draw=function(list){
+    if(!overlay.classList.contains('on')||CUR_DETAIL!==fid)return;
+    var byTeam={};(list||[]).forEach(function(t){var id=String((t.team||{}).id!=null?t.team.id:t.id);byTeam[id]=t.injuries||[];});
+    var side=function(tid,name){var arr=(byTeam[String(tid)]||[]).filter(function(i){return i.status&&i.status!=='Active';});
+      var order={out:0,dud:1,ok:2};arr.sort(function(a,b){return order[(INJ_ST[a.status]||['','dud'])[1]]-order[(INJ_ST[b.status]||['','dud'])[1]];});
+      return '<div><h4>'+esc(name)+'</h4>'+(arr.length?arr.map(function(i){var st=INJ_ST[i.status]||[i.status,'dud'],a=i.athlete||{};
+        return '<div class="inj"><span class="inj-st '+st[1]+'">'+esc(st[0])+'</span><span class="n">'+esc(a.displayName||a.shortName||'')+'</span><span class="s">'+esc(injReason(i))+'</span></div>';}).join(''):'<p class="cap" style="margin:4px 0 0">Sin bajas reportadas.</p>')+'</div>';};
+    box.innerHTML='<h3 style="font-size:18px;margin-bottom:4px">Bajas y lesionados</h3><p style="color:var(--muted);font-size:14px;margin:0 0 10px">Reporte oficial de lesiones de la NBA (vía ESPN). Se actualiza durante el día; revisa antes de apostar.</p><div class="key-pl">'+side(f.hid,f.home)+side(f.aid,f.away)+'</div>';
+    box.hidden=false;};
+  jget(ESPN+'basketball/nba/summary?event='+eid).then(function(j){
+    if(j.injuries&&j.injuries.length)return draw(j.injuries);
+    return jget(ESPN+'basketball/nba/injuries').then(function(x){draw(x.injuries||[]);});
+  }).catch(function(){jget(ESPN+'basketball/nba/injuries').then(function(x){draw(x.injuries||[]);}).catch(function(){});});
+}
 /* ---------- EN VIVO: marcador y estadísticas directo desde ESPN (sin video) ---------- */
 var ESPN='https://site.api.espn.com/apis/site/v2/sports/';
 var SOC_SLUG={PL:'eng.1',PD:'esp.1',SA:'ita.1',BL1:'ger.1',FL1:'fra.1',CL:'uefa.champions',PPL:'por.1',DED:'ned.1',ELC:'eng.2',PER:'per.1',ARG:'arg.1',BRA:'bra.1',MEX:'mex.1',COL:'col.1',CHI:'chi.1',LIB:'conmebol.libertadores',SUD:'conmebol.sudamericana',MLS:'usa.1',UEL:'uefa.europa',UECL:'uefa.europa.conf',TUR:'tur.1',SCO:'sco.1',BEL:'bel.1',KSA:'ksa.1'};
