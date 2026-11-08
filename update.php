@@ -187,6 +187,21 @@ unset($h);
 $history = array_values(array_filter($history, fn($h) => $h['ts'] > $now - 180 * 86400));
 usort($history, fn($a, $b) => $b['ts'] <=> $a['ts']);
 
+// Partidos en juego: la API ya no los marca como "no empezado", así que se recuperan de la versión anterior
+// y se mantienen hasta que terminan (o hasta un tiempo máximo por deporte), para que la web los siga mostrando en vivo.
+$prevPath = "$dataDir/pronosticos.json";
+if (empty($cfg['mock']) && is_file($prevPath)) {
+    $prev = json_decode(file_get_contents($prevPath), true) ?: [];
+    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5];
+    $have = array_flip(array_column($matches, 'id'));
+    foreach ($prev['matches'] ?? [] as $pm) {
+        if (!isset($pm['id'], $pm['ts']) || isset($have[$pm['id']])) continue;
+        if (isset($finalScores[$pm['id']])) continue; // ya terminó o se anuló
+        $end = $pm['ts'] + (int)(($dur[$pm['sport'] ?? ''] ?? 3.5) * 3600);
+        if ($pm['ts'] <= $now && $end > $now) { $matches[] = $pm; $have[$pm['id']] = 1; }
+    }
+}
+
 usort($matches, fn($a, $b) => $a['ts'] <=> $b['ts']);
 $out = [
     'brand' => $cfg['brand'], 'brand_short' => $cfg['brand_short'], 'contact' => $cfg['contact'],
