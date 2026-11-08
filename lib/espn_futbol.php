@@ -8,7 +8,10 @@
 
 const ESPN_SOCCER_SLUGS = [
     'PL' => 'eng.1', 'PD' => 'esp.1', 'SA' => 'ita.1', 'BL1' => 'ger.1', 'FL1' => 'fra.1',
-    'CL' => 'uefa.champions', 'PPL' => 'por.1', 'DED' => 'ned.1',
+    'CL' => 'uefa.champions', 'PPL' => 'por.1', 'DED' => 'ned.1', 'ELC' => 'eng.2',
+    'PER' => 'per.1', 'ARG' => 'arg.1', 'BRA' => 'bra.1', 'MEX' => 'mex.1', 'COL' => 'col.1', 'CHI' => 'chi.1',
+    'LIB' => 'conmebol.libertadores', 'SUD' => 'conmebol.sudamericana', 'MLS' => 'usa.1', 'UEL' => 'uefa.europa',
+    'UECL' => 'uefa.europa.conf', 'TUR' => 'tur.1', 'SCO' => 'sco.1', 'BEL' => 'bel.1', 'KSA' => 'ksa.1',
 ];
 
 function espn_soccer_base(string $slug): string
@@ -91,7 +94,7 @@ function futbol_players_update(array $cfg, array $codes, string $dataDir, array 
     $now = (int)($GLOBALS['UMBRAL_NOW'] ?? time());
     $dir = "$dataDir/fut";
     if (!is_dir($dir)) mkdir($dir, 0775, true);
-    $budget = (int)(getenv('FUT_MAX_BOX') ?: 260); // planillas por ejecución (en total)
+    $budget = (int)(getenv('FUT_MAX_BOX') ?: 400); // planillas por ejecución (en total)
     $teamsOut = [];
     $logs = [];
 
@@ -104,7 +107,8 @@ function futbol_players_update(array $cfg, array $codes, string $dataDir, array 
         $path = "$dir/$code.json";
         $db = is_file($path) ? (json_decode(file_get_contents($path), true) ?: []) : [];
         $y = (int)gmdate('Y', $now);
-        $season = ((int)gmdate('n', $now) >= 7) ? $y : $y - 1;
+        $calYear = in_array($code, ['PER', 'ARG', 'BRA', 'COL', 'CHI', 'LIB', 'SUD', 'MLS'], true); // ligas de año calendario
+        $season = $calYear ? $y : (((int)gmdate('n', $now) >= 7) ? $y : $y - 1);
         if (($db['season'] ?? null) !== $season) $db = ['season' => $season, 'teams' => [], 'players' => [], 'done' => [], 'queue' => [], 'days' => []];
         $db += ['tm' => [], 'tmx' => []];
         $done = array_flip(array_map('strval', $db['done'] ?? []));

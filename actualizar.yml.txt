@@ -1,0 +1,45 @@
+name: Actualizar pronósticos
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # cada 3 horas
+  workflow_dispatch:          # botón "Run workflow" para ejecutarlo a mano
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Calcular pronósticos y cerrar resultados
+        env:
+          API_SPORTS_KEY: ${{ secrets.API_SPORTS_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+          UMBRAL_DATA_DIR: public/data
+          UMBRAL_CACHE_DIR: /tmp/umbral-cache
+        run: |
+          php update.php
+          echo "----- registro -----"
+          cat /tmp/umbral-cache/update.log || true
+
+      - name: Guardar los datos nuevos
+        run: |
+          git config user.name "umbral-bot"
+          git config user.email "umbral-bot@users.noreply.github.com"
+          # Se pone encima de lo último que haya en GitHub; si otro guardado se cruza, reintenta
+          for i in 1 2 3; do
+            git fetch -q origin main
+            git reset -q origin/main
+            git add public/data
+            git commit -q -m "Actualizar pronósticos" || { echo "Sin cambios"; exit 0; }
+            git push -q origin HEAD:main && exit 0
+            echo "Otro guardado se cruzó, reintento $i"; sleep 5
+          done
+          exit 1

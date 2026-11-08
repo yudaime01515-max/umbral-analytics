@@ -802,8 +802,8 @@ var PL_MODES={
     sorts:[['pts','Puntos'],['reb','Rebotes'],['ast','Asistencias'],['tpm','Triples'],['min','Minutos']],
     file:function(){return 'nba.json';}}
 };
-var FUT_LEAGUES=[['PL','Premier League'],['PD','LaLiga'],['SA','Serie A'],['BL1','Bundesliga'],['FL1','Ligue 1'],['CL','Champions League'],['PPL','Primeira Liga'],['DED','Eredivisie']];
-var plState={mode:'fut',league:'PL',q:'',team:'',sort:'g'},PL_CACHE={},CUR=null;
+var FUT_LEAGUES=[['PER','Liga 1 Perú'],['PL','Premier League'],['PD','LaLiga'],['SA','Serie A'],['BL1','Bundesliga'],['FL1','Ligue 1'],['CL','Champions League'],['UEL','Europa League'],['UECL','Conference League'],['LIB','Copa Libertadores'],['SUD','Copa Sudamericana'],['ARG','Liga Argentina'],['BRA','Brasileirão'],['MEX','Liga MX'],['COL','Liga Colombia'],['CHI','Liga Chile'],['MLS','MLS'],['PPL','Primeira Liga'],['DED','Eredivisie'],['ELC','Championship'],['TUR','Superliga Turquía'],['SCO','Premiership Escocia'],['BEL','Liga Bélgica'],['KSA','Liga Saudí']];
+var plState={mode:'fut',league:'PER',q:'',team:'',sort:'g'},PL_CACHE={},CUR=null;
 function plKey(mode,lg){return mode==='nba'?'nba':'fut/'+lg;}
 function getPL(mode,lg){
   var k=plKey(mode,lg),M=PL_MODES[mode];
@@ -1009,7 +1009,7 @@ function renderKeyPlayers(f){
 
 /* ---------- EN VIVO: marcador y estadísticas directo desde ESPN (sin video) ---------- */
 var ESPN='https://site.api.espn.com/apis/site/v2/sports/';
-var SOC_SLUG={PL:'eng.1',PD:'esp.1',SA:'ita.1',BL1:'ger.1',FL1:'fra.1',CL:'uefa.champions',PPL:'por.1',DED:'ned.1'};
+var SOC_SLUG={PL:'eng.1',PD:'esp.1',SA:'ita.1',BL1:'ger.1',FL1:'fra.1',CL:'uefa.champions',PPL:'por.1',DED:'ned.1',ELC:'eng.2',PER:'per.1',ARG:'arg.1',BRA:'bra.1',MEX:'mex.1',COL:'col.1',CHI:'chi.1',LIB:'conmebol.libertadores',SUD:'conmebol.sudamericana',MLS:'usa.1',UEL:'uefa.europa',UECL:'uefa.europa.conf',TUR:'tur.1',SCO:'sco.1',BEL:'bel.1',KSA:'ksa.1'};
 var LIVE={},LIVE_EVT={},liveTimer=null,detTimer=null,LIVE_OK=true;
 function ymdLocal(ts){var d=new Date(ts*1000-5*3600*1000);return d.toISOString().slice(0,10).replace(/-/g,'');}
 function jget(url){return fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});}

@@ -7,11 +7,12 @@
 
 const FINISHED = ['FT', 'AET', 'PEN', 'AOT', 'AP', 'AW'];
 const NOT_STARTED = ['NS', 'TBD'];
-const VOID_STATUS = ['PST', 'CANC', 'ABD', 'AWD', 'WO', 'POST', 'INTR', 'SUSP'];
+const VOID_STATUS = ['PST', 'CANC', 'ABD', 'AWD', 'WO', 'POST', 'INTR', 'SUSP', 'XET'];
 
 function api_get(array $cfg, string $sportKey, array $sport, array $league): array
 {
     $root = dirname(__DIR__);
+    if (($league['src'] ?? '') === 'espn') return espn_league_games($cfg, $league);
     if (($sport['source'] ?? '') === 'espn') return espn_nba_events($cfg, $league);
     if (($sport['source'] ?? '') === 'balldontlie') return bdl_get($cfg, $sportKey, $league);
     $fd = ($sport['source'] ?? 'apisports') === 'footballdata';
@@ -143,6 +144,7 @@ function bdl_get(array $cfg, string $sportKey, array $league): array
 /** Normaliza un partido de cualquier deporte. */
 function normalize(string $sportKey, array $g, string $leagueName, string $source = 'apisports'): ?array
 {
+    if ($source === 'espn_norm') return $g; // ya viene en formato común
     if ($source === 'espn') return espn_normalize($g, $leagueName);
     if ($source === 'balldontlie') {
         $st = (string)($g['status'] ?? '');

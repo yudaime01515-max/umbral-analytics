@@ -11,6 +11,7 @@ require "$root/lib/models.php";
 require "$root/lib/espn.php";
 require "$root/lib/espn_futbol.php";
 require "$root/lib/tenis.php";
+require "$root/lib/espn_ligas.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -76,9 +77,11 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         $any = true;
         $raw = api_get($cfg, $sportKey, $sport, $league);
         if (($sport['source'] ?? '') === 'espn' && !empty($sport['players'])) $nbaEvents = $raw;
-        if (($sport['source'] ?? '') === 'footballdata' && !empty($sport['players']) && !empty($league['code'])) $futCodes[] = $league['code'];
-        $futRaw = (($sport['source'] ?? '') === 'footballdata' && !empty($league['code'])) ? $league['code'] : null;
-        $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name'], $sport['source'] ?? 'apisports'), $raw)));
+        $isFut = $sportKey === 'futbol' && !empty($league['code']) && (($sport['source'] ?? '') === 'footballdata' || ($league['src'] ?? '') === 'espn');
+        if ($isFut && !empty($sport['players'])) $futCodes[] = $league['code'];
+        $futRaw = $isFut ? $league['code'] : null;
+        $src = ($league['src'] ?? '') === 'espn' ? 'espn_norm' : ($sport['source'] ?? 'apisports');
+        $games = array_values(array_filter(array_map(fn($g) => normalize($sportKey, $g, $league['name'], $src), $raw)));
 
         $finished = array_values(array_filter($games, fn($g) => in_array($g['status'], FINISHED, true) && $g['hs'] !== null && $g['ts'] < $now));
         if ($futRaw) $futTs[$futRaw] = array_column($finished, 'ts');
