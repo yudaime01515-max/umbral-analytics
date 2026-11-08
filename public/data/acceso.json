@@ -1,0 +1,37 @@
+{
+  "nota": "Para quitar el acceso a alguien, borra su línea. Para agregar a alguien, pídele a Claude un código nuevo.",
+  "codigos": [
+    {
+      "persona": "Persona 1",
+      "h": "5eedbd4d2bbe21f4538af91f1cf379a7d3a8178c428216d46312ff1d5bc9a12a"
+    },
+    {
+      "persona": "Persona 2",
+      "h": "16ee9d30e3c90f293814f355c26140e9bf9669bd76498dd6f4235dd1fe17bfb1"
+    },
+    {
+      "persona": "Persona 3",
+      "h": "8ebdbe824f6a65b1170dee09594a2993eeb275de89af50c33218bd94798792b1"
+    },
+    {
+      "persona": "Persona 4",
+      "h": "7b9f5287f827146376ab1466f777ef930bd95b132354bbc674f26730515e088a"
+    },
+    {
+      "persona": "Persona 5",
+      "h": "ed9055a3e6157e3a1f314a2550140b200d60971b6cc76c0b0272441c4382875d"
+    },
+    {
+      "persona": "Persona 6",
+      "h": "0b9faa7b468f5428937d30e04a831e35c0dbc2a6d1401287cde9837b15d7db34"
+    },
+    {
+      "persona": "Persona 7",
+      "h": "4813c7028e07077076e601e3118ce1aae5ff3219a875915ed334da6aa2fa3e78"
+    },
+    {
+      "persona": "Persona 8",
+      "h": "da4ffb62ae24a5807f505eed50117281125f3695a34674a3f194e4a9d5056175"
+    }
+  ]
+}
