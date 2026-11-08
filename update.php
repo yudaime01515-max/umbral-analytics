@@ -95,8 +95,10 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         $R = team_ratings($finished, $now);
 
         foreach ($games as $g) {
-            if (!in_array($g['status'], NOT_STARTED, true)) continue;
-            if ($g['ts'] < $startToday || $g['ts'] >= $endWindow) continue;
+            // Por jugarse o en juego (en juego se sigue mostrando con su pronóstico previo; la web lo recalcula en vivo)
+            if (!in_array($g['status'], NOT_STARTED, true) && $g['status'] !== 'LIVE') continue;
+            if ($g['status'] === 'LIVE' && $g['ts'] < $now - 4 * 3600) continue;
+            if ($g['ts'] < $startToday - 6 * 3600 || $g['ts'] >= $endWindow) continue;
             $model = model_match($sport, $R, $g);
             if (!$model) continue;
             $pick = best_pick($model['markets'], $th);
