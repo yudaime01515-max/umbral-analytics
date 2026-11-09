@@ -57,13 +57,14 @@ nav.views a:hover{color:var(--text)}
 .demo-pill{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted);padding:6px 10px;border-radius:999px}
 
 /* Héroe: el umbral */
-.hero{padding:44px 0 28px}
+.hero{padding:30px 0 22px}
+.trust{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:13px;color:var(--good)}
 .hero-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end}
-.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(44px,7vw,92px);line-height:.9;text-transform:uppercase;letter-spacing:-.005em}
+.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(30px,4vw,52px);line-height:.95;text-transform:uppercase;letter-spacing:-.005em;max-width:24ch}
 .hero h1 em{font-style:normal;color:var(--accent)}
 .hero p.lead{color:var(--muted);max-width:56ch;font-size:17px;margin:16px 0 0}
 .big-threshold{text-align:right}
-.big-threshold .val{font-family:var(--display);font-weight:900;font-size:clamp(88px,13vw,168px);line-height:.82;color:var(--accent);display:block}
+.big-threshold .val{font-family:var(--display);font-weight:900;font-size:clamp(64px,8vw,112px);line-height:.82;color:var(--accent);display:block}
 .big-threshold .lbl{color:var(--muted)}
 .ruler-card{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px 20px 14px}
 .ruler-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
@@ -109,7 +110,7 @@ nav.views a:hover{color:var(--text)}
 .pick .meta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px;flex-wrap:wrap}
 .pick .meta .sport{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
 .pick .teams{display:flex;flex-direction:column;gap:2px;margin:10px 0 12px;font-weight:600;font-size:17px}
-.pick .teams span{display:flex;justify-content:space-between;gap:10px}
+.pick .teams > span{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left}
 .form{display:inline-flex;gap:3px}
 .form i{width:7px;height:7px;border-radius:2px;display:inline-block}
 .form .w{background:var(--good)}.form .d{background:#5B6782}.form .l{background:var(--bad)}
@@ -119,7 +120,7 @@ nav.views a:hover{color:var(--text)}
 .bar > i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:4px}
 .bar .th{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);opacity:.55}
 .prob{text-align:right;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;min-width:96px}
-.prob .p{font-family:var(--display);font-weight:900;font-size:54px;line-height:.85}
+.prob .p{font-family:var(--display);font-weight:900;font-size:44px;line-height:.85}
 .prob .p small{font-size:26px}
 .prob .odds{font-size:13px;color:var(--muted);text-align:right}
 .prob .odds b{color:var(--text);font-family:var(--mono)}
@@ -145,6 +146,28 @@ nav.views a:hover{color:var(--text)}
 .kpi.warn .v{color:var(--bad)}
 .kpi.ok .v{color:var(--good)}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-top:16px}
+.combos{margin:6px 0 22px;padding:20px;border-radius:20px;background:linear-gradient(160deg,rgba(255,90,54,.10),rgba(255,90,54,0) 55%),var(--panel);border:1px solid rgba(255,90,54,.35)}
+.cb-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.cb-tabs button{min-height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer}
+.cb-tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#170A05}
+.cb{background:var(--bg)}
+.cb-copy{margin-top:auto;min-height:34px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);font-weight:600;font-size:13px;cursor:pointer}
+.cb-copy:hover{border-color:var(--accent)}
+.sg{grid-column:1/-1;border:1px dashed var(--line);border-radius:12px;padding:10px 12px;font-size:13px;display:grid;gap:4px}
+.sg-h{display:flex;justify-content:space-between;align-items:baseline;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+.sg-h b{color:var(--accent);font-size:18px;letter-spacing:0}
+.sg-l{display:flex;justify-content:space-between;gap:10px}.sg-l .num{color:var(--muted)}
+.sg-f{color:var(--muted);font-size:12px}
+@media (max-width:640px){.combos{padding:14px}.cb{padding:12px}}
+
+.combos h2{font-size:22px;margin:0 0 4px}.combos>.cap{color:var(--muted);font-size:14px;margin:0 0 12px}
+.cb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.cb{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.cb-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cb-top b{font-size:16px}.cb-odds{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent)}
+.cb-meta{font-size:13px;color:var(--muted)}
+.cb-leg{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;color:inherit;cursor:pointer;width:100%}
+.cb-leg .m{font-weight:600;font-size:14px}.cb-leg .t{color:var(--muted);grid-column:1}.cb-leg .p{font-family:var(--mono);grid-row:span 2;align-self:center;text-align:right}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}
 .card h3{font-size:18px;margin-bottom:4px}
 .card .cap{color:var(--muted);font-size:14px;margin:0 0 14px}
@@ -337,7 +360,7 @@ footer{margin-top:64px;border-top:1px solid var(--line);background:#070B15}
 /* Tarjetas de pronóstico: línea superior sin cortes raros */
 .pick .meta{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
 .pick .meta .lgname{overflow:hidden;text-overflow:ellipsis;min-width:0}
-.pick .tn{flex:1;justify-content:flex-start}
+.pick .tn{justify-content:flex-start;text-align:left}
 .pick .tn > span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.12}
 @media (max-width:720px){
   .hits,.splits{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -408,25 +431,14 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
       <div class="hero-grid">
         <div>
           <p class="mono" style="color:var(--muted);margin:0 0 14px">El umbral · <span id="heroDate"></span></p>
-          <h1>Solo publicamos lo que el modelo ve <em>por encima del umbral</em></h1>
-          <p class="lead">Cada punto de la regla es un mercado con su probabilidad calculada. Arrastra la línea: lo que queda a la derecha es lo que ves abajo.</p>
+          <h1>Las combinadas y pronósticos <em>más seguros del día</em></h1>
+          <p class="lead">Nuestro modelo analiza cada partido —fútbol, NBA, tenis y esports— y solo te muestra lo que supera tu probabilidad mínima. Las combinadas se arman solas con lo mejor del día.</p>
+          <div class="trust"><span>✓ Calculado con datos reales</span><span>✓ Se actualiza cada hora</span><span>✓ Historial de aciertos público</span></div>
         </div>
         <div class="big-threshold">
           <span class="val num" id="bigVal">70%</span>
           <span class="mono lbl">Probabilidad mínima</span>
         </div>
-      </div>
-      <div class="ruler-card">
-        <div class="ruler-head">
-          <strong id="rulerTitle">Todos los mercados del día</strong>
-          <span class="stat"><b class="num" id="statAbove">0</b> mercados superan el umbral, en <b class="num" id="statMatches">0</b> partidos de <b class="num" id="statTotal">0</b></span>
-        </div>
-        <div class="ruler">
-          <canvas id="ruler" aria-hidden="true"></canvas>
-          <input type="range" id="threshold" min="50" max="92" step="1" value="70" aria-label="Probabilidad mínima para mostrar un pronóstico">
-        </div>
-        <div class="ruler-scale mono"><span>50%</span><span>60%</span><span>70%</span><span>80%</span><span>90%</span></div>
-        <div class="ruler-hint">Gris: por debajo del umbral. Naranja: se publica. Con el teclado, usa las flechas sobre la regla.</div>
       </div>
     </div>
 
@@ -451,6 +463,22 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
         </div>
       </div>
     </div>
+
+    <section id="combos" class="combos" hidden></section>
+
+      <div class="ruler-card" style="margin-bottom:8px">
+        <div class="ruler-head">
+          <strong id="rulerTitle">Todos los mercados del día</strong>
+          <span class="stat"><b class="num" id="statAbove">0</b> mercados superan el umbral, en <b class="num" id="statMatches">0</b> partidos de <b class="num" id="statTotal">0</b></span>
+        </div>
+        <div class="ruler">
+          <canvas id="ruler" aria-hidden="true"></canvas>
+          <input type="range" id="threshold" min="50" max="92" step="1" value="70" aria-label="Probabilidad mínima para mostrar un pronóstico">
+        </div>
+        <div class="ruler-scale mono"><span>50%</span><span>60%</span><span>70%</span><span>80%</span><span>90%</span></div>
+        <div class="ruler-hint">Gris: por debajo del umbral. Naranja: se publica. Con el teclado, usa las flechas sobre la regla.</div>
+      </div>
+
 
     <div class="board-head">
       <h2 id="boardTitle">Pronósticos</h2>
@@ -689,7 +717,7 @@ function renderPicks(){
   document.getElementById('rulerTitle').textContent='Todos los mercados · '+dl;
   document.getElementById('boardTitle').textContent='Pronósticos · '+dl.toLowerCase();
   document.getElementById('boardSub').textContent=rows.length+(rows.length===1?' partido':' partidos')+' con al menos un mercado sobre '+pct(th)+'%';
-  renderSports(counts);
+  renderSports(counts);renderCombos(list);
   if(!list.length){elPicks.innerHTML='<div class="empty"><strong>No hay partidos programados para este día</strong>Prueba con otro día o revisa más tarde.</div>';return;}
   if(!rows.length){elPicks.innerHTML='<div class="empty"><strong>Ningún partido supera '+pct(th)+'% con estos filtros</strong>Baja el umbral en la regla, cambia de deporte o de día.</div>';return;}
   elPicks.innerHTML=rows.map(function(r){var f=r.f,m=r.pk.market,sp=SPORT_BY[f.sport]||{name:f.sport};
@@ -697,10 +725,93 @@ function renderPicks(){
       '<div style="min-width:0"><div class="meta"><span class="sport" title="'+esc(sp.name)+'">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span>'+(liveState(f)==='live'?'<span class="live-pill">'+(LIVE[f.id]?esc(String(LIVE[f.id].hs))+' – '+esc(String(LIVE[f.id].as))+(LIVE[f.id].txt?' · '+esc(LIVE[f.id].txt):''):'EN JUEGO')+'</span>':'<span class="num" style="flex:none">'+timeStr(f.ts)+'</span>')+'<span>·</span><span class="lgname" title="'+esc(f.league)+'">'+esc(f.league)+'</span></div>'+
       '<div class="teams"><span><span class="tn">'+logo(f.logoH)+'<span>'+esc(f.home)+'</span></span>'+formHTML(f.formH)+'</span><span><span class="tn">'+logo(f.logoA)+'<span>'+esc(f.away)+'</span></span>'+formHTML(f.formA)+'</span></div>'+
       '<div class="market"><span class="name">'+esc(m.n)+(isLiveMk(f)?' <small class="lv-tag">EN VIVO · min '+Math.round(LIVE_MK[f.id].t)+'\'</small>':'')+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
-      '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+
+      '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+comboHTML(f)+
       '<div class="more"><span>'+(r.pk.count>1?'<b>'+(r.pk.count-1)+'</b> mercado'+(r.pk.count>2?'s':'')+' más sobre el umbral':'Único mercado sobre el umbral')+'</span><span>Ver análisis →</span></div>'+
     '</button>';}).join('');
 }
+/* ---------- combinadas sugeridas ----------
+   Una selección por partido (partidos distintos = resultados independientes).
+   Para cada combinada se fija una probabilidad mínima total; cada selección debe superar su parte
+   (raíz k-ésima) y, entre las que la superan, se eligen las de menor probabilidad: son las que más pagan. */
+var COMBO_TIERS=[['Segura',2,0.75],['Equilibrada',3,0.60],['Buena cuota',4,0.50],['Cuota alta',5,0.40]];
+function comboLegOk(f,m){
+  if(f.sport==='basquet'&&/^\d\.(ª|er|º) cuarto:|mitad:/.test(m.n))return false; // cuartos y mitades: más variables
+  if(f.sport==='basquet'&&mkGroup(f,m.n)==='Jugadores')return false;           // jugadores: dependen de lesiones y minutos
+  return true;
+}
+/* Combinada del mismo partido: una selección por tipo de mercado (resultado, córners, tarjetas, faltas…),
+   que dependen poco entre sí. En NBA: una del partido + jugadores distintos. Mínimo 2, máximo 3 selecciones. */
+function sameGameCombo(f){
+  if(f.sport!=='futbol'&&f.sport!=='basquet')return null;
+  var byKey={};
+  f.markets.forEach(function(m){
+    if(m.p<0.75||m.p>=0.97)return;
+    var g=mkGroup(f,m.n),key=g;
+    if(f.sport==='futbol'&&g==='Remates')return;             // los remates van muy de la mano con los córners
+    if(f.sport==='basquet'){
+      if(g==='Equipos'||g==='Mitades'||g==='Cuartos')return;
+      if(g==='Jugadores')key='J:'+m.n.split(':')[0];
+    }
+    if(!byKey[key]||m.p<byKey[key].p)byKey[key]=m;            // dentro de cada tipo, la que más paga
+  });
+  var legs=Object.keys(byKey).map(function(k){return byKey[k];}).sort(function(a,b){return b.p-a.p;}),pick=[],p=1;
+  for(var i=0;i<legs.length&&pick.length<3;i++){if(p*legs[i].p>=0.55){pick.push(legs[i]);p*=legs[i].p;}}
+  return pick.length>=2?{legs:pick,p:p}:null;
+}
+function comboHTML(f){
+  if(liveState(f)!=='pre')return '';
+  var c=sameGameCombo(f);if(!c)return '';
+  return '<div class="sg"><div class="sg-h"><span>Combinada del partido</span><b class="num">'+(1/c.p).toFixed(2)+'</b></div>'+
+    c.legs.map(function(m){return '<div class="sg-l"><span>'+esc(m.n)+'</span><span class="num">'+pct(m.p)+'%</span></div>';}).join('')+
+    '<div class="sg-f">Acertar todas: '+pct(c.p)+'%</div></div>';
+}
+var COMBO_TAB=null,COMBO_LAST=[];
+var CB_GROUPS=[['futbol','Fútbol',function(s){return s==='futbol';}],['basquet','NBA',function(s){return s==='basquet';}],
+  ['esports','Esports',function(s){return ['cs2','dota2','lol','valorant','r6','ow','mlbb','sc2'].indexOf(s)>=0;}],['tenis','Tenis',function(s){return s==='tenis';}],['mix','Mixta',function(){return true;}]];
+function renderCombos(list){
+  var box=document.getElementById('combos'),now=Date.now()/1000,q=state.q.trim().toLowerCase();
+  var games=list.filter(function(f){return f.ts>now+300&&(state.sport==='all'||f.sport===state.sport)&&(!q||(f.home+' '+f.away+' '+f.league).toLowerCase().indexOf(q)>=0);});
+  // pestañas por deporte (solo cuando se ven todos los deportes)
+  var tabsHTML='';
+  if(state.sport==='all'){
+    var avail=CB_GROUPS.filter(function(g){return games.filter(function(f){return g[2](f.sport);}).length>=2;});
+    if(!avail.some(function(g){return g[0]===COMBO_TAB;}))COMBO_TAB=avail.length?avail[0][0]:null;
+    var G=CB_GROUPS.filter(function(g){return g[0]===COMBO_TAB;})[0];if(G)games=games.filter(function(f){return G[2](f.sport);});
+    if(avail.length>1)tabsHTML='<div class="cb-tabs" role="group" aria-label="Deporte de la combinada">'+avail.map(function(g){return '<button data-cbt="'+g[0]+'" aria-pressed="'+(g[0]===COMBO_TAB)+'">'+g[1]+'</button>';}).join('')+'</div>';
+  }
+  var cards=[],used={};
+  COMBO_TIERS.forEach(function(t){
+    var name=t[0],k=t[1],T=t[2],need=Math.pow(T,1/k),legs=[];
+    games.forEach(function(f){
+      var best=null;f.markets.forEach(function(m){if(m.p>=need&&m.p<0.97&&comboLegOk(f,m)&&(!best||m.p<best.p))best=m;});
+      if(best)legs.push({f:f,m:best});
+    });
+    // primero los partidos que no salieron en otra combinada, luego la selección que más paga
+    legs.sort(function(a,b){return ((used[a.f.id]?1:0)-(used[b.f.id]?1:0))||(a.m.p-b.m.p);});
+    if(legs.length<k)return;
+    var pick=legs.slice(0,k),p=1;pick.forEach(function(l){p*=l.m.p;used[l.f.id]=1;});
+    cards.push({name:name,k:k,p:p,legs:pick});
+  });
+  if(!cards.length){box.hidden=true;box.innerHTML='';return;}
+  COMBO_LAST=cards;
+  box.innerHTML='<h2>Combinadas del día</h2><p class="cap">Armadas por nuestro modelo con selecciones muy probables de partidos distintos: juntas suben la cuota sin dejar de ser sólidas. La cuota es la justa del modelo; la casa suele pagar un poco menos (≈5% por selección).</p>'+tabsHTML+'<div class="cb-grid">'+
+    cards.map(function(c,ci){
+      return '<div class="cb"><div class="cb-top"><b>'+esc(c.name)+'</b><span class="cb-odds">'+(1/c.p).toFixed(2)+'</span></div>'+
+        '<div class="cb-meta">'+c.k+' selecciones · probabilidad de acertar todas: <b>'+pct(c.p)+'%</b></div>'+
+        c.legs.map(function(l){var sp=SPORT_BY[l.f.sport]||{name:l.f.sport};return '<button class="cb-leg" data-id="'+esc(l.f.id)+'"><span class="m">'+esc(l.m.n)+'</span><span class="p">'+pct(l.m.p)+'%</span><span class="t">'+esc(l.f.home+' vs '+l.f.away)+' · '+esc(sp.name)+' · '+timeStr(l.f.ts)+'</span></button>';}).join('')+
+        '<button class="cb-copy" data-cb="'+ci+'">Copiar combinada</button>'+
+      '</div>';}).join('')+'</div>';
+  box.hidden=false;
+}
+document.getElementById('combos').addEventListener('click',function(e){
+  var t=e.target.closest('[data-cbt]');if(t){COMBO_TAB=t.dataset.cbt;renderPicks();return;}
+  var c=e.target.closest('.cb-copy');
+  if(c){var cb=COMBO_LAST[+c.dataset.cb];if(!cb)return;
+    var txt='Combinada '+cb.name+' · cuota justa '+(1/cb.p).toFixed(2)+' ('+pct(cb.p)+'%)\n'+cb.legs.map(function(l){return '• '+l.f.home+' vs '+l.f.away+' ('+timeStr(l.f.ts)+'): '+l.m.n+' — '+pct(l.m.p)+'%';}).join('\n')+'\nUmbral Analytics';
+    var ok=function(){c.textContent='¡Copiada!';setTimeout(function(){c.textContent='Copiar combinada';},1600);};
+    try{navigator.clipboard.writeText(txt).then(ok,function(){window.prompt('Copia la combinada:',txt);});}catch(err){window.prompt('Copia la combinada:',txt);}
+    return;}
+  var b=e.target.closest('.cb-leg');if(b)openDetail(b.dataset.id);});
 function renderSports(counts){
   var items=[{id:'all',name:'Todos'}].concat(DATA.sports);
   document.getElementById('sports').innerHTML=items.map(function(s){return '<button class="chip" data-sport="'+s.id+'" aria-pressed="'+(state.sport===s.id)+'">'+(s.id==='all'?'':icon(s.id,16))+esc(s.name)+' <span class="count num">'+(counts[s.id]||0)+'</span></button>';}).join('');
