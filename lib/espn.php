@@ -271,7 +271,7 @@ function nba_props(array $m, array $db): array
                 $var = 0; foreach ($v as $x) $var += ($x - $mu) ** 2; $sd = max(sqrt($var / max(1, $n - 1)), sqrt($mu) * 1.1, 1.0);
                 $base = floor($mu) + 0.5; $step = $mu >= 15 ? 3 : ($mu >= 6 ? 2 : 1);
                 foreach ([-$step, 0, $step] as $d) {
-                    $L = $base + $d; if ($L < 0.5) continue;
+                    $L = $base + $d; if ($L < 0.5 || ($L < 1.5 && $sn !== 'triples')) continue; // sin líneas regaladas
                     $emp = count(array_filter($v, fn($x) => $x > $L)) / $n;
                     $nrm = 1 - ncdf($L, $mu, $sd);
                     $w = $n / ($n + 6); // con 10 partidos, ~60% pesa lo que pasó y ~40% la curva
