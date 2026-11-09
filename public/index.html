@@ -391,6 +391,118 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
 .gate-box input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .gate-box button{min-height:50px;border:0;border-radius:12px;background:var(--accent);color:#1A0A05;font-weight:800;font-size:16px;cursor:pointer}
 .gate-err{color:#F87171;font-size:13px;min-height:18px}
+
+/* ============================================================
+   CAPA DE DISEÑO v2 — pulido visual (solo estética, sin tocar lógica)
+   ============================================================ */
+:root{
+  --radius:18px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+  --shadow:0 10px 30px -12px rgba(0,0,0,.6);
+  --shadow-accent:0 14px 40px -16px rgba(255,90,54,.45);
+  --grad-accent:linear-gradient(135deg,#FF6B47,#FF4A2E 60%,#E23E22);
+}
+/* Fondo con profundidad: resplandores de estadio */
+body{
+  background:
+    radial-gradient(1200px 620px at 78% -8%, rgba(255,90,54,.10), transparent 58%),
+    radial-gradient(1000px 560px at 10% 4%, rgba(53,110,214,.10), transparent 55%),
+    var(--bg);
+  background-attachment:fixed;
+}
+/* Transiciones suaves por defecto */
+button,.chip,.pick,.kpi,.card,.hit,.pl-row,nav.views a,.field,.days button,.cb,a{
+  transition:border-color .18s ease, transform .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease;
+}
+/* Scrollbars finos y elegantes */
+*{scrollbar-width:thin;scrollbar-color:#2A3A5A transparent}
+*::-webkit-scrollbar{height:8px;width:8px}
+*::-webkit-scrollbar-thumb{background:#2A3A5A;border-radius:8px}
+*::-webkit-scrollbar-thumb:hover{background:#3A4A6C}
+
+/* Marca con brillo */
+.brand-mark{box-shadow:0 6px 18px -6px rgba(255,90,54,.6);background:var(--grad-accent)}
+.brand-name span{color:var(--accent)}
+
+/* Héroe: número umbral con resplandor */
+.big-threshold .val{
+  background:linear-gradient(180deg,#FF7A5A,#FF4A2E);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 8px 28px rgba(255,90,54,.35));
+}
+.hero h1 em{background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* Paneles con superficie en gradiente + sombra + borde iluminado */
+.ruler-card,.pick,.kpi,.card,.cb,.combos,.steps li,.empty,.note,.gate-box,.dialog{
+  background-image:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 40%);
+  background-color:var(--panel);
+  box-shadow:var(--shadow);
+}
+.ruler-card{box-shadow:0 18px 50px -20px rgba(0,0,0,.7)}
+
+/* Chips de deporte: activo con gradiente de acento */
+.chip[aria-pressed="true"]{
+  background:var(--grad-accent);color:#190A05;border-color:transparent;
+  box-shadow:var(--shadow-accent)
+}
+.chip:hover{transform:translateY(-1px)}
+
+/* Tarjetas de pronóstico: elevación, barra de acento, número vivo */
+.pick{overflow:hidden}
+.pick::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--grad-accent);opacity:0;transition:opacity .18s ease;
+}
+.pick:hover{border-color:#44588A;transform:translateY(-3px);box-shadow:0 20px 44px -20px rgba(0,0,0,.75)}
+.pick:hover::before{opacity:1}
+.prob .p{
+  background:linear-gradient(180deg,#FFFFFF,#C7D2E6);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.pick:hover .prob .p{background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bar{box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.bar > i{background:var(--grad-accent);box-shadow:0 0 12px -2px rgba(255,90,54,.6)}
+
+/* Botones de acento con gradiente + sombra */
+.gate-box button,.stream-btn,.cb-tabs button[aria-pressed="true"]{
+  background:var(--grad-accent)!important;box-shadow:var(--shadow-accent)
+}
+.gate-box button:hover,.stream-btn:hover{transform:translatey(-1px);filter:brightness(1.05)}
+
+/* KPIs y títulos */
+.kpi:hover{transform:translateY(-2px);border-color:#3A4A6C}
+.kpi .v{background:linear-gradient(180deg,#FFFFFF,#AEBAD0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi.ok .v{background:linear-gradient(180deg,#5BE3B0,#1F9E73);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kpi.warn .v{background:linear-gradient(180deg,#FF9A9A,#E04B4B);-webkit-background-clip:text;background-clip:text;color:transparent}
+.section-title{background:linear-gradient(180deg,#FFFFFF,#9FB0CC);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* Filas de jugadores y combos: hover con leve elevación */
+.pl-row:hover,.cb:hover,.hit:hover{transform:translateY(-2px)}
+.cb-odds{text-shadow:0 2px 14px rgba(255,90,54,.35)}
+
+/* Navegación: subrayado animado del acento */
+nav.views a{position:relative}
+nav.views a[aria-current="page"]{background:var(--panel-2)}
+nav.views a[aria-current="page"]::after{
+  content:"";position:absolute;left:12px;right:12px;bottom:3px;height:2px;border-radius:2px;background:var(--grad-accent)
+}
+
+/* Franja legal y de demo con un toque más suave */
+.legal-strip{background:var(--grad-accent)}
+
+/* Entrada suave de las tarjetas al renderizar */
+@keyframes umbEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.picks .pick{animation:umbEnter .32s ease both}
+.picks .pick:nth-child(2){animation-delay:.03s}
+.picks .pick:nth-child(3){animation-delay:.06s}
+.picks .pick:nth-child(4){animation-delay:.09s}
+.picks .pick:nth-child(5){animation-delay:.12s}
+.picks .pick:nth-child(6){animation-delay:.15s}
+@media (prefers-reduced-motion:reduce){.picks .pick{animation:none!important}}
+
+/* Gate: tarjeta con más presencia */
+.gate-box{box-shadow:0 30px 80px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,90,54,.12)}
+.gate-box h1 span{color:var(--accent)}
 </style>
 </head>
 <body>
