@@ -35,9 +35,13 @@ jobs:
         run: |
           git config user.name "umbral-bot"
           git config user.email "umbral-bot@users.noreply.github.com"
+          # Guarda lo que calculó, trae lo último de GitHub y pone encima SOLO los datos calculados.
+          # acceso.json (los códigos) nunca se toca desde aquí.
+          rm -rf /tmp/nuevos && cp -r public/data /tmp/nuevos && rm -f /tmp/nuevos/acceso.json
           for i in 1 2 3; do
             git fetch -q origin main
-            git reset -q origin/main
+            git reset -q --hard origin/main
+            cp -r /tmp/nuevos/. public/data/
             git add public/data
             git commit -q -m "Actualizar pronósticos" || { echo "Sin cambios"; exit 0; }
             git push -q origin HEAD:main && exit 0
