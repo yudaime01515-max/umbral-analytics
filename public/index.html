@@ -1584,9 +1584,16 @@ function startApp(){
 (function(){
   var KEY='umbral_acceso',saved=null;try{saved=localStorage.getItem(KEY);}catch(e){}
   var err=document.getElementById('gateErr'),inp=document.getElementById('gateCode');
+  var CHECK_MS=20000,active=null,hb=null,busy=false;
   function sha(t){return crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)).then(function(b){return Array.prototype.map.call(new Uint8Array(b),function(x){return ('0'+x.toString(16)).slice(-2);}).join('');});}
-  function ok(h){try{localStorage.setItem(KEY,h);}catch(e){}document.documentElement.classList.remove('locked');startApp();}
-  var listP=loadJSON('acceso.json',false).then(function(d){return (d.codigos||[]).map(function(c){return c.h;});});
+  function fetchList(){return loadJSON('acceso.json',false).then(function(d){return (d.codigos||[]).map(function(c){return c.h;});});}
+  function lock(){if(hb){clearInterval(hb);hb=null;}active=null;try{localStorage.removeItem(KEY);}catch(e){}document.documentElement.classList.add('locked');location.reload();}
+  function check(){if(busy||!active)return;busy=true;fetchList().then(function(list){if(active&&list.indexOf(active)<0)lock();}).catch(function(){}).then(function(){busy=false;});}
+  function watch(){if(hb)clearInterval(hb);hb=setInterval(check,CHECK_MS);}
+  function ok(h){active=h;try{localStorage.setItem(KEY,h);}catch(e){}document.documentElement.classList.remove('locked');startApp();watch();}
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)check();});
+  window.addEventListener('focus',check);
+  var listP=fetchList();
   listP.then(function(list){if(saved&&list.indexOf(saved)>=0)ok(saved);else{try{localStorage.removeItem(KEY);}catch(e){}inp.focus();}})
        .catch(function(){err.textContent='No se pudo verificar el acceso. Revisa tu conexión y recarga.';});
   document.getElementById('gateForm').addEventListener('submit',function(e){
@@ -1594,7 +1601,7 @@ function startApp(){
     var code=inp.value.trim().toUpperCase().replace(/\s+/g,''),raw=code.replace(/[^A-Z0-9]/g,'');
     // acepta el código con o sin guiones (UMB-XXXX-XXXX)
     if(/^UMB[A-Z0-9]{8}$/.test(raw))code='UMB-'+raw.slice(3,7)+'-'+raw.slice(7);if(!code){err.textContent='Escribe tu código.';return;}
-    Promise.all([listP,sha(code)]).then(function(r){if(r[0].indexOf(r[1])>=0)ok(r[1]);else{err.textContent='Código incorrecto o sin acceso.';inp.select();}})
+    Promise.all([fetchList(),sha(code)]).then(function(r){if(r[0].indexOf(r[1])>=0)ok(r[1]);else{err.textContent='Código incorrecto o sin acceso.';inp.select();}})
       .catch(function(){err.textContent='No se pudo verificar. Recarga la página.';});
   });
 })();
