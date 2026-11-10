@@ -714,6 +714,22 @@ nav.views a[aria-current="page"]::after{
 .fdots{display:flex;gap:5px;margin-left:auto}
 .fd{width:17px;height:17px;border-radius:5px;display:inline-block}
 .fd.w{background:#34D399}.fd.l{background:#3A4868}
+.formsub{color:var(--muted);font-size:12px;margin:-2px 0 8px;padding-left:2px}
+.pf-wrap{display:grid;gap:16px}
+@media(min-width:620px){.pf-wrap{grid-template-columns:1fr 1fr}}
+.pf-team h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600}
+.pfrow{display:grid;grid-template-columns:1fr auto auto;grid-template-areas:"n v chip" "bar bar bar" "sub sub sub";gap:3px 8px;align-items:center;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);padding:9px 0;cursor:pointer}
+.pf-team .pfrow:last-child{border-bottom:0}
+.pf-n{grid-area:n;font-size:14px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-v{grid-area:v;font-weight:800;font-size:15px;color:var(--text)}
+.pf-chip{grid-area:chip;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.pf-chip.up{background:rgba(52,211,153,.16);color:#34D399}
+.pf-chip.down{background:rgba(248,113,113,.16);color:#F87171}
+.pf-chip.eq{background:#22304C;color:var(--muted)}
+.pf-bar{grid-area:bar;height:9px;background:#1b2740;border-radius:5px;overflow:hidden}
+.pf-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+.pf-sub{grid-area:sub;color:var(--muted);font-size:11.5px}
+.pfrow:hover .pf-n{color:var(--accent)}
 </style>
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <div class="dialog">
@@ -1000,6 +1016,9 @@ function drawMarkets(){
 document.getElementById('dMkTabs').addEventListener('click',function(e){var b=e.target.closest('[data-g]');if(!b)return;MK_TAB=b.dataset.g;drawMarkets();});
 function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
 function mkByName(f,name){var r=null;f.markets.forEach(function(m){if(m.n===name)r=m;});return r;}
+function nbaRecord(arr){arr=arr||[];var w=0;arr.forEach(function(x){if(x==='w')w++;});var l=arr.length-w;
+  var st=0,last=null,i;for(i=arr.length-1;i>=0;i--){if(last===null)last=arr[i];if(arr[i]===last)st++;else break;}
+  var stxt=st?(st+(last==='w'?'V':'D')):'';return w+'V-'+l+'D'+(stxt?' · racha '+stxt:'');}
 function renderNbaViz(f){
   var el=document.getElementById('dViz');if(!el)return;
   if(f.sport!=='basquet'){el.hidden=true;el.innerHTML='';return;}
@@ -1022,11 +1041,30 @@ function renderNbaViz(f){
       '<div class="scorerow"><span class="sc-t">'+esc(f.home)+'</span><div class="sc-bar"><i style="width:'+sh+'%;background:'+(hpts>=apts?'var(--accent)':'#4A5878')+'"></i></div><span class="sc-v num">'+hpts+'</span></div>'+
       '<div class="scorerow"><span class="sc-t">'+esc(f.away)+'</span><div class="sc-bar"><i style="width:'+sa+'%;background:'+(apts>hpts?'var(--accent)':'#4A5878')+'"></i></div><span class="sc-v num">'+apts+'</span></div></div>';}
   if((f.formH&&f.formH.length)||(f.formA&&f.formA.length)){
-    html+='<div class="viz-card"><div class="viz-h">Forma reciente <small>últimos 5</small></div>'+
-      '<div class="formrow"><span class="sc-t">'+esc(f.home)+'</span><span class="fdots">'+dots(f.formH)+'</span></div>'+
-      '<div class="formrow"><span class="sc-t">'+esc(f.away)+'</span><span class="fdots">'+dots(f.formA)+'</span></div></div>';}
-  if(!html){el.hidden=true;el.innerHTML='';return;}
-  el.innerHTML=html;el.hidden=false;
+    html+='<div class="viz-card"><div class="viz-h">Partidos anteriores <small>últimos 5</small></div>'+
+      '<div class="formrow"><span class="sc-t">'+esc(f.home)+'</span><span class="fdots">'+dots(f.formH)+'</span></div><div class="formsub">'+esc(nbaRecord(f.formH))+'</div>'+
+      '<div class="formrow"><span class="sc-t">'+esc(f.away)+'</span><span class="fdots">'+dots(f.formA)+'</span></div><div class="formsub">'+esc(nbaRecord(f.formA))+'</div></div>';}
+  el.innerHTML=html;el.hidden=!html;
+  if(f.hid==null)return;
+  var fid=f.id;
+  getPL('nba').then(function(D){
+    if(!overlay.classList.contains('on')||CUR_DETAIL!==fid)return;KEY_D=D;
+    function topForm(tid){return Object.keys(D.players).map(function(id){return D.players[id];})
+      .filter(function(p){return String(p.t)===String(tid)&&p.gp>=3;})
+      .sort(function(a,b){return b.l5.pts-a.l5.pts;}).slice(0,3);}
+    function pbars(ps,teamName){if(!ps.length)return '';
+      var rows=ps.map(function(p){var v=p.l5.pts,w=Math.min(100,Math.round(v/40*100)),d=v-p.avg.pts,
+        cls=d>=1.5?'up':(d<=-1.5?'down':'eq'),ar=d>=1.5?'▲':(d<=-1.5?'▼':'=');
+        return '<button class="pfrow" data-pid="'+esc(p.id)+'"><span class="pf-n">'+esc(p.n)+'</span>'+
+          '<div class="pf-bar"><i style="width:'+Math.max(w,4)+'%"></i></div>'+
+          '<span class="pf-v num">'+f1(v)+'</span>'+
+          '<span class="pf-chip '+cls+'">'+ar+' '+f1(Math.abs(d))+'</span>'+
+          '<span class="pf-sub">'+f1(p.l5.reb)+' REB · '+f1(p.l5.ast)+' AST</span></button>';}).join('');
+      return '<div class="pf-team"><h4>'+esc(teamName)+'</h4>'+rows+'</div>';}
+    var h=pbars(topForm(f.hid),f.home)+pbars(topForm(f.aid),f.away);if(!h)return;
+    var card='<div class="viz-card span2 pf-card"><div class="viz-h">Jugadores en mejor forma <small>promedio de PTS en sus últimos 5 · ▲▼ vs su temporada</small></div><div class="pf-wrap">'+h+'</div></div>';
+    el.innerHTML=el.innerHTML+card;el.hidden=false;
+  });
 }
 function renderDist(d,f){
   var el=document.getElementById('dDist'),t=document.getElementById('dDistTitle'),c=document.getElementById('dDistCap');
@@ -1674,6 +1712,7 @@ document.getElementById('plLeague').addEventListener('change',function(e){plStat
 document.getElementById('plMode').addEventListener('click',function(e){var b=e.target.closest('[data-mode]');if(!b||b.dataset.mode===plState.mode)return;plState.mode=b.dataset.mode;plState.team='';plLoad();});
 document.getElementById('plList').addEventListener('click',function(e){var b=e.target.closest('[data-pid]');if(b)openPlayer(CUR,b.dataset.pid);});
 document.getElementById('dPlayers').addEventListener('click',function(e){var b=e.target.closest('[data-pid]');if(b)openPlayer(KEY_D,b.dataset.pid);});
+document.getElementById('dViz').addEventListener('click',function(e){var b=e.target.closest('[data-pid]');if(b&&KEY_D)openPlayer(KEY_D,b.dataset.pid);});
 document.getElementById('pClose').addEventListener('click',closePlayer);
 pOverlay.addEventListener('click',function(e){if(e.target===pOverlay)closePlayer();});
 overlay.addEventListener('click',function(e){if(e.target===overlay)closeDetail();});
