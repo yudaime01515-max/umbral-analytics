@@ -115,6 +115,8 @@ return [
                 ['code' => 'CIT', 'slug' => 'ita.coppa_italia', 'src' => 'espn', 'name' => 'Coppa Italia', 'on' => true],
                 ['code' => 'DFB', 'slug' => 'ger.dfb_pokal', 'src' => 'espn', 'name' => 'DFB Pokal', 'on' => true],
                 ['code' => 'CDF', 'slug' => 'fra.coupe_de_france', 'src' => 'espn', 'name' => 'Copa de Francia', 'on' => true],
+                ['code' => 'UWCL', 'slug' => 'uefa.wchampions', 'src' => 'espn', 'name' => 'Champions League Femenina', 'on' => true],
+                ['code' => 'COLC', 'slug' => 'col.copa', 'src' => 'espn', 'name' => 'Copa Colombia', 'on' => true],
             ] : [
                 ['id' => 281, 'season' => 2026, 'name' => 'Liga 1 Perú',     'on' => true],
                 ['id' => 39,  'season' => 2026, 'name' => 'Premier League',  'on' => true],
