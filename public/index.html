@@ -695,6 +695,26 @@ nav.views a[aria-current="page"]::after{
   </div>
 </div>
 
+<style>
+.nbaviz{display:grid;gap:12px;margin:2px 0 18px}
+@media(min-width:620px){.nbaviz{grid-template-columns:1fr 1fr}.nbaviz .viz-card.span2{grid-column:1 / -1}}
+.viz-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.viz-h{font-weight:700;font-size:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--text)}
+.viz-h small{color:var(--muted);font-weight:500;font-size:12px}
+.wpbar{display:flex;height:34px;border-radius:9px;overflow:hidden;font-size:13px;font-weight:800}
+.wpbar .wp-h{background:var(--accent);color:#170A05;display:flex;align-items:center;padding-left:11px;min-width:40px}
+.wpbar .wp-a{background:#3A4868;color:#EEF2F8;display:flex;align-items:center;justify-content:flex-end;padding-right:11px;min-width:40px}
+.viz-legend{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:6px;gap:8px}
+.viz-legend span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:48%}
+.scorerow,.formrow{display:flex;align-items:center;gap:10px;margin:8px 0}
+.scorerow .sc-t,.formrow .sc-t{flex:0 0 40%;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-bar{flex:1;height:12px;background:#1b2740;border-radius:6px;overflow:hidden}
+.sc-bar i{display:block;height:100%;border-radius:6px}
+.sc-v{flex:0 0 auto;font-weight:800;font-size:16px;min-width:32px;text-align:right;color:var(--text)}
+.fdots{display:flex;gap:5px;margin-left:auto}
+.fd{width:17px;height:17px;border-radius:5px;display:inline-block}
+.fd.w{background:#34D399}.fd.l{background:#3A4868}
+</style>
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <div class="dialog">
     <div class="d-head">
@@ -708,6 +728,7 @@ nav.views a[aria-current="page"]::after{
     <div class="d-body">
       <div id="dLive" class="lv" hidden></div>
       <div class="d-facts" id="dFacts"></div>
+      <div id="dViz" class="nbaviz" hidden></div>
       <div id="dPlayers" hidden></div>
       <div id="dInj" hidden></div>
       <div>
@@ -944,6 +965,7 @@ function openDetail(id){
   var facts=f.exp.map(function(e){return '<div><div class="k">'+esc(e[0])+'</div><div class="v num">'+esc(e[1])+'</div></div>';}).join('');
   facts+='<div><div class="k">Pronóstico publicado</div><div class="v" style="font-size:20px;line-height:1.25;padding-top:4px">'+(best?esc(best.market.n)+' · '+pct(best.market.p)+'%':'Ninguno sobre '+pct(th)+'%')+'</div></div>';
   document.getElementById('dFacts').innerHTML=facts;
+  renderNbaViz(f);
   MK_F=f;MK_TAB=null;drawMarkets();
   renderDist(f.dist,f);
   CUR_DETAIL=f.id;renderKeyPlayers(f);renderInjuries(f);startLiveDetail(f);
@@ -977,6 +999,35 @@ function drawMarkets(){
 }
 document.getElementById('dMkTabs').addEventListener('click',function(e){var b=e.target.closest('[data-g]');if(!b)return;MK_TAB=b.dataset.g;drawMarkets();});
 function closeDetail(){overlay.classList.remove('on');document.body.style.overflow='';if(lastFocus)lastFocus.focus();}
+function mkByName(f,name){var r=null;f.markets.forEach(function(m){if(m.n===name)r=m;});return r;}
+function renderNbaViz(f){
+  var el=document.getElementById('dViz');if(!el)return;
+  if(f.sport!=='basquet'){el.hidden=true;el.innerHTML='';return;}
+  var gh=mkByName(f,'Gana '+f.home),ga=mkByName(f,'Gana '+f.away);
+  var pH=gh?gh.p:null,pA=ga?ga.p:null;
+  var total=null,margin=null;
+  (f.exp||[]).forEach(function(e){var lab=String(e[0]||''),val=String(e[1]||'');
+    if(/total/i.test(lab)){var mt=val.match(/[\d.]+/);if(mt)total=parseFloat(mt[0]);}
+    if(/margen/i.test(lab)){var mm=val.match(/[-+]?[\d.]+/);if(mm)margin=parseFloat(mm[0]);}});
+  var hpts=null,apts=null;
+  if(total!=null&&margin!=null){hpts=Math.round((total+margin)/2);apts=Math.round((total-margin)/2);}
+  function dots(arr){return (arr||[]).map(function(x){return '<i class="fd '+(x==='w'?'w':'l')+'" title="'+(x==='w'?'Victoria':'Derrota')+'"></i>';}).join('');}
+  var html='';
+  if(pH!=null&&pA!=null&&(pH+pA)>0){var wH=Math.round(pH/(pH+pA)*100),wA=100-wH;
+    html+='<div class="viz-card span2"><div class="viz-h">Probabilidad de victoria</div>'+
+      '<div class="wpbar"><span class="wp-h" style="width:'+Math.max(wH,8)+'%">'+pct(pH)+'%</span><span class="wp-a" style="width:'+Math.max(wA,8)+'%">'+pct(pA)+'%</span></div>'+
+      '<div class="viz-legend"><span>'+esc(f.home)+'</span><span>'+esc(f.away)+'</span></div></div>';}
+  if(hpts!=null&&apts!=null){var mx=Math.max(hpts,apts)||1,sh=Math.round(hpts/mx*100),sa=Math.round(apts/mx*100);
+    html+='<div class="viz-card"><div class="viz-h">Marcador proyectado <small>Total '+total+' · margen '+(margin>0?'+':'')+margin+'</small></div>'+
+      '<div class="scorerow"><span class="sc-t">'+esc(f.home)+'</span><div class="sc-bar"><i style="width:'+sh+'%;background:'+(hpts>=apts?'var(--accent)':'#4A5878')+'"></i></div><span class="sc-v num">'+hpts+'</span></div>'+
+      '<div class="scorerow"><span class="sc-t">'+esc(f.away)+'</span><div class="sc-bar"><i style="width:'+sa+'%;background:'+(apts>hpts?'var(--accent)':'#4A5878')+'"></i></div><span class="sc-v num">'+apts+'</span></div></div>';}
+  if((f.formH&&f.formH.length)||(f.formA&&f.formA.length)){
+    html+='<div class="viz-card"><div class="viz-h">Forma reciente <small>últimos 5</small></div>'+
+      '<div class="formrow"><span class="sc-t">'+esc(f.home)+'</span><span class="fdots">'+dots(f.formH)+'</span></div>'+
+      '<div class="formrow"><span class="sc-t">'+esc(f.away)+'</span><span class="fdots">'+dots(f.formA)+'</span></div></div>';}
+  if(!html){el.hidden=true;el.innerHTML='';return;}
+  el.innerHTML=html;el.hidden=false;
+}
 function renderDist(d,f){
   var el=document.getElementById('dDist'),t=document.getElementById('dDistTitle'),c=document.getElementById('dDistCap');
   if(d.kind==='matrix'){
