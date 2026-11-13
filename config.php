@@ -34,7 +34,7 @@ return [
     'threshold'    => 0.70,
 
     // Días hacia adelante que se muestran (0 = solo hoy)
-    'days_ahead'   => 3,
+    'days_ahead'   => 5,
 
     // Minutos que se guarda cada respuesta de la API antes de volver a pedirla (ahorra consultas)
     'cache_minutes'=> 180,
