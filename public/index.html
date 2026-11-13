@@ -415,7 +415,7 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
         </div>
         <div class="ruler">
           <canvas id="ruler" aria-hidden="true"></canvas>
-          <input type="range" id="threshold" min="50" max="92" step="1" value="70" aria-label="Probabilidad mínima para mostrar un pronóstico">
+          <input type="range" id="threshold" min="50" max="92" step="1" value="75" aria-label="Probabilidad mínima para mostrar un pronóstico">
         </div>
         <div class="ruler-scale mono"><span>50%</span><span>60%</span><span>70%</span><span>80%</span><span>90%</span></div>
         <div class="ruler-hint">Gris: por debajo del umbral. Naranja: se publica. Con el teclado, usa las flechas sobre la regla.</div>
@@ -449,6 +449,7 @@ html.locked #gate{display:grid;position:fixed;inset:0;z-index:100;place-items:ce
       <h2 id="boardTitle">Pronósticos</h2>
       <span class="sub" id="boardSub"></span>
     </div>
+    <div class="note" id="comboNote" style="margin-bottom:14px"></div>
     <div class="picks" id="picks"><div class="loading">Cargando pronósticos…</div></div>
 
     <div class="note">
@@ -608,7 +609,8 @@ var ICON={
 function icon(k,size){return '<svg width="'+(size||16)+'" height="'+(size||16)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICON[k]||ICON.futbol)+'</svg>';}
 
 var DATA=null,HIST=[],SPORT_BY={},DAYS=[],TZ='America/Lima';
-var state={th:0.70,sport:'all',day:0,q:'',sort:'time',all:false};
+var ODDS_ON=false,CAL=null;
+var state={th:0.75,sport:'all',day:0,q:'',sort:'time',all:false};
 try{var saved=JSON.parse(localStorage.getItem('umbral-state')||'null');if(saved){state.th=saved.th||0.7;state.sport=saved.sport||'all';state.sort=saved.sort||'time';}}catch(e){}
 function save(){try{localStorage.setItem('umbral-state',JSON.stringify({th:state.th,sport:state.sport,sort:state.sort}));}catch(e){}}
 
@@ -617,7 +619,7 @@ function timeStr(ts){return new Date(ts*1000).toLocaleTimeString('es-PE',{timeZo
 function dateStr(ts,opts){return new Date(ts*1000).toLocaleDateString('es-PE',Object.assign({timeZone:TZ},opts)).replace('.','');}
 function dayLabel(key){var today=dayKey(Date.now()/1000),tom=dayKey(Date.now()/1000+86400);if(key===today)return 'Hoy';if(key===tom)return 'Mañana';var p=key.split('-');return new Date(Date.UTC(+p[0],+p[1]-1,+p[2],12)).toLocaleDateString('es-PE',{timeZone:'UTC',weekday:'short',day:'numeric'}).replace('.','');}
 
-function pickFor(m,th){var a=m.markets.filter(function(x){return x.p>=th;});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
+function pickFor(m,th){var a=m.markets.filter(function(x){return x.p>=th&&x.pub===true&&(!ODDS_ON||x.q);});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
 // Duración aproximada de cada deporte: pasado ese tiempo el partido ya terminó y deja de mostrarse
 // Si ESPN ya dijo cómo va el partido, manda eso. Si no, se usa un tiempo máximo generoso por deporte.
 var DUR={futbol:2.6,basquet:3.4,tenis:4.5};
@@ -656,9 +658,9 @@ function renderPicks(){
   var aboveMk=0,matchesWith=0,total=0,rows=[];
   list.forEach(function(f){
     var pk=pickFor(f,th);
-    if(state.sport==='all'||f.sport===state.sport){total++;f.markets.forEach(function(m){if(m.p>=th)aboveMk++;});if(pk)matchesWith++;}
+    if(state.sport==='all'||f.sport===state.sport){total++;f.markets.forEach(function(m){if(m.p>=th&&m.pub===true&&(!ODDS_ON||m.q))aboveMk++;});if(pk)matchesWith++;}
     // "Todos los partidos": también los que no llegan al umbral, mostrando su mercado más probable
-    if(!pk&&state.all&&f.markets.length){var best=f.markets.slice().sort(function(x,y){return y.p-x.p;})[0];pk={market:best,count:0,below:true};}
+    if(!pk&&state.all&&f.markets.some(function(x){return x.pub===true;})){var best=f.markets.filter(function(x){return x.pub===true;}).sort(function(x,y){return y.p-x.p;})[0];pk={market:best,count:0,below:true};}
     if(pk){counts.all++;counts[f.sport]=(counts[f.sport]||0)+1;}
     if(!pk)return;
     if(state.sport!=='all'&&f.sport!==state.sport)return;
@@ -675,6 +677,8 @@ function renderPicks(){
   var dl=DAYS.length?dayLabel(DAYS[state.day]):'Hoy';
   document.getElementById('rulerTitle').textContent='Todos los mercados · '+dl;
   document.getElementById('boardTitle').textContent='Pronósticos · '+dl.toLowerCase();
+  (function(){var el=document.getElementById('comboNote');if(!el)return;var g=CAL&&CAL.global,r=g&&g.n>=20?g.real:null,p=r!==null?r:Math.max(th,0.7),f=function(n){return Math.round(Math.pow(p,n)*100);};
+    el.innerHTML='<b class="tag">OJO</b><div><strong>Cada pronóstico se juega solo.</strong> '+(r!==null?'Hasta hoy Umbral acertó <strong>'+Math.round(r*100)+'%</strong> de '+g.n+' pronósticos cerrados (el modelo ya se corrige con eso). ':'')+'Si juntas varios en una combinada, la probabilidad se multiplica y cae rápido: con '+Math.round(p*100)+'% cada uno, <strong>2 juntos aciertan '+f(2)+'%, 3 juntos '+f(3)+'%, 5 juntos '+f(5)+'%</strong>. Ninguna probabilidad es una fija.'+(ODDS_ON?'':' Las cuotas de casas aún no están conectadas: confirma que tu casa ofrezca el mercado antes de apostar.')+'</div>';})();
   document.getElementById('boardSub').textContent=state.all?(rows.length+(rows.length===1?' partido':' partidos')+' · '+matchesWith+' superan '+pct(th)+'%'):(rows.length+(rows.length===1?' partido':' partidos')+' con al menos un mercado sobre '+pct(th)+'%');
   renderSports(counts);
   if(!list.length){elPicks.innerHTML='<div class="empty"><strong>No hay partidos programados para este día</strong>Prueba con otro día o revisa más tarde.</div>';return;}
@@ -684,7 +688,7 @@ function renderPicks(){
       '<div style="min-width:0"><div class="meta"><span class="sport" title="'+esc(sp.name)+'">'+icon(f.sport,15)+esc(sp.name)+'</span><span>·</span>'+(liveState(f)==='live'?'<span class="live-pill">'+(LIVE[f.id]?esc(String(LIVE[f.id].hs))+' – '+esc(String(LIVE[f.id].as))+(LIVE[f.id].txt?' · '+esc(LIVE[f.id].txt):''):'EN JUEGO')+'</span>':'<span class="num" style="flex:none">'+timeStr(f.ts)+'</span>')+'<span>·</span><span class="lgname" title="'+esc(f.league)+'">'+esc(f.league)+'</span></div>'+
       '<div class="teams"><span><span class="tn">'+logo(f.logoH)+'<span>'+esc(f.home)+'</span></span>'+formHTML(f.formH)+'</span><span><span class="tn">'+logo(f.logoA)+'<span>'+esc(f.away)+'</span></span>'+formHTML(f.formA)+'</span></div>'+
       '<div class="market"><span class="name">'+esc(m.n)+'</span><div class="bar"><i style="width:'+(m.p*100).toFixed(1)+'%"></i><span class="th" style="left:'+(th*100)+'%"></span></div></div></div>'+
-      '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">Cuota justa<br><b>'+fair(m.p)+'</b></span></div>'+
+      '<div class="prob"><span class="p num">'+pct(m.p)+'<small>%</small></span><span class="odds">'+(m.q?'Cuota casa'+(m.qe?' ≈':'')+'<br><b>'+m.q.toFixed(2)+'</b><br><small style="opacity:.7">justa '+fair(m.p)+(m.p*m.q>=1?' · con valor':'')+'</small>':'Cuota justa<br><b>'+fair(m.p)+'</b>')+'</span></div>'+
       '<div class="more"><span>'+(r.pk.below?'No llega al umbral · su mercado más probable':r.pk.count>1?'<b>'+(r.pk.count-1)+'</b> mercado'+(r.pk.count>2?'s':'')+' más sobre el umbral':'Único mercado sobre el umbral')+'</span><span>Ver análisis →</span></div>'+
     '</button>';}).join('');
 }
@@ -1176,8 +1180,9 @@ document.getElementById('year').textContent=new Date().getFullYear();
 function startApp(){
   Promise.all([
     loadJSON('pronosticos.json',false),
-    loadJSON('historial.json',true).catch(function(){return [];})
-  ]).then(function(res){DATA=res[0];HIST=res[1]||[];boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
+    loadJSON('historial.json',true).catch(function(){return [];}),
+    loadJSON('calibracion.json',true).catch(function(){return null;})
+  ]).then(function(res){DATA=res[0];HIST=res[1]||[];CAL=(res[2]&&res[2].cal)||null;ODDS_ON=!!(res[2]&&res[2].odds);boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
 }
 /* ---------- acceso con código: la lista está en data/acceso.json (se edita en GitHub sin gastar créditos) ---------- */
 (function(){

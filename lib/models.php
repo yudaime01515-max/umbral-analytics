@@ -258,11 +258,25 @@ function settle(array $rule, int $hs, int $as): bool
     return false;
 }
 
-/** Mercado publicado: el de menor probabilidad que aún supera el umbral (es el que paga mejor). */
-function best_pick(array $markets, float $th): ?array
+/**
+ * Mercado publicado. Solo cuentan los mercados "publicables" (los que las casas ofrecen casi siempre).
+ * Con ODDS_API_KEY además se exige cuota real; si hay cuotas se elige el de mejor valor (p × cuota),
+ * y en modo 'valor' solo se publica si p × cuota >= valor_min.
+ */
+function best_pick(array $markets, float $th, ?string $sport = null): ?array
 {
-    $above = array_values(array_filter($markets, fn($m) => $m['p'] >= $th && !in_array($m['r'][0] ?? '', ['per', 'pp'], true)));
+    $cfg = $GLOBALS['UMBRAL_CFG'] ?? [];
+    $conCuotas = function_exists('odds_activo') && odds_activo();
+    $valorMin = ($cfg['cuotas_modo'] ?? 'existe') === 'valor' ? (float)($cfg['valor_min'] ?? 1.0) : null;
+    $above = array_values(array_filter($markets, function ($m) use ($th, $conCuotas, $valorMin) {
+        if ($m['p'] < $th || in_array($m['r'][0] ?? '', ['per', 'pp'], true)) return false;
+        if (!($m['pub'] ?? false)) return false;
+        if ($conCuotas && empty($m['q'])) return false;                         // la casa no lo ofrece: no se publica
+        if ($valorMin !== null && $m['p'] * ($m['q'] ?? 0) < $valorMin) return false;
+        return true;
+    }));
     if (!$above) return null;
+    if ($conCuotas) { usort($above, fn($a, $b) => ($b['p'] * $b['q']) <=> ($a['p'] * $a['q'])); return $above[0]; }
     usort($above, fn($a, $b) => $a['p'] <=> $b['p']);
     return $above[0];
 }

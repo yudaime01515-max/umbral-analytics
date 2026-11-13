@@ -31,7 +31,23 @@ return [
     'timezone'     => 'America/Lima',
 
     // Probabilidad mínima para publicar un pronóstico y guardarlo en el historial (0.70 = 70 %)
-    'threshold'    => 0.70,
+    // (subido a 0.75: con 0.70 el modelo acertaba ~2 de cada 3; arriba de 0.80 acierta bastante más, a cambio de menos pronósticos)
+    'threshold'    => 0.75,
+
+    // Mercados que se pueden publicar como pronóstico (los que las casas casi siempre ofrecen).
+    // res = ganador, dc = doble oportunidad, tot = más/menos, btts = ambos marcan, hcp = hándicap.
+    // Se quitan: marcador exacto en sets, "gana al menos un set", córners/tarjetas, totales por equipo, por periodos.
+    'publicables' => [
+        'default' => ['res', 'dc', 'tot', 'btts', 'hcp'],
+        'tenis'   => ['res', 'tot'],
+    ],
+
+    // Cuotas reales (opcional): con el secreto ODDS_API_KEY solo se publica lo que una casa ofrece de verdad.
+    // 'existe' = basta con que haya cuota; 'valor' = además p × cuota >= valor_min (publica menos, pero con ventaja real)
+    'cuotas_modo'     => 'existe',
+    'valor_min'       => 1.0,
+    'odds_ttl_hours'  => 24,   // cada liga se consulta una vez al día (el plan gratis da 500 créditos al mes)
+    'odds_regions'    => 'eu',
 
     // Días hacia adelante que se muestran (0 = solo hoy)
     'days_ahead'   => 5,

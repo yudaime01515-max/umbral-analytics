@@ -13,6 +13,8 @@ require "$root/lib/espn_futbol.php";
 require "$root/lib/tenis.php";
 require "$root/lib/espn_ligas.php";
 require "$root/lib/esports.php";
+require "$root/lib/aprendizaje.php";
+require "$root/lib/cuotas.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -20,6 +22,7 @@ if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
     exit('Acceso denegado');
 }
 date_default_timezone_set($cfg['timezone']);
+$GLOBALS['UMBRAL_CFG'] = $cfg;
 @set_time_limit(300);
 
 $now = (int)(getenv('UMBRAL_NOW') ?: time());
@@ -41,6 +44,8 @@ $isMock = !empty($cfg['mock']);
 $history = array_values(array_filter($history, fn($h) => !empty($h['mock']) === $isMock));
 $histIdx = [];
 foreach ($history as $i => $h) $histIdx[$h['id']] = $i;
+// El modelo aprende: corrige sus probabilidades con lo que acertó y falló hasta hoy
+$CAL = aprender_calibracion($history);
 
 $matches = [];
 $futCodes = [];
@@ -60,12 +65,13 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
         catch (Throwable $e) { log_line("ERROR $sportKey: " . $e->getMessage()); continue; }
         foreach ($tn['final'] as $fid => $fv) $finalScores[$fid] = $fv;
         foreach ($tn['matches'] as $tm) {
+            $tm['markets'] = calibrar_markets($tm['markets'], $sportKey, $CAL);
             $matches[] = $tm;
-            $pick = best_pick($tm['markets'], $th);
+            $pick = best_pick($tm['markets'], $th, $sportKey);
             if ($pick && $tm['ts'] > $now) {
                 $entry = [
                     'id' => $tm['id'], 'sport' => $sportKey, 'league' => $tm['league'], 'ts' => $tm['ts'],
-                    'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'r' => $pick['r'],
+                    'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
                     'status' => 'pending', 'score' => null, 'mock' => $isMock,
                 ];
                 if (!isset($histIdx[$tm['id']])) { $history[] = $entry; $histIdx[$tm['id']] = count($history) - 1; }
@@ -101,7 +107,9 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             if ($g['ts'] < $startToday - 6 * 3600 || $g['ts'] >= $endWindow) continue;
             $model = model_match($sport, $R, $g);
             if (!$model) continue;
-            $pick = best_pick($model['markets'], $th);
+            $oddsEv = odds_liga($cfg, (string)($league['code'] ?? ''));
+            $model['markets'] = calibrar_markets($model['markets'], $sportKey, $CAL, $oddsEv, $g);
+            $pick = best_pick($model['markets'], $th, $sportKey);
             $fullMk[$g['id']] = $model['markets'];
             $draws = $sport['model'] === 'poisson_draw';
             $matches[] = [
@@ -111,13 +119,13 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 'lgc' => $league['code'] ?? null, 'hf' => $g['home_full'] ?? '', 'af' => $g['away_full'] ?? '',
                 'formH' => recent_form($finished, $g['home_id'], $draws), 'formA' => recent_form($finished, $g['away_id'], $draws),
                 'exp' => $model['exp'], 'dist' => $model['dist'],
-                'markets' => array_values(array_column(array_map(fn($m) => ['n' => $m['n'], 'p' => $m['p']], $model['markets']), null, 'n')),
+                'markets' => array_values(array_column(array_map(fn($m) => array_filter(['n' => $m['n'], 'p' => $m['p'], 'pub' => $m['pub'] ?: null, 'q' => $m['q'] ?? null, 'qe' => $m['qe'] ?? null], fn($v) => $v !== null), $model['markets']), null, 'n')),
             ];
             // Guarda en el historial el pronóstico publicado, solo antes de que empiece el partido
             if ($pick && $g['ts'] > $now) {
                 $entry = [
                     'id' => $g['id'], 'sport' => $sportKey, 'league' => $g['league'], 'ts' => $g['ts'],
-                    'home' => $g['home'], 'away' => $g['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'r' => $pick['r'],
+                    'home' => $g['home'], 'away' => $g['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
                     'status' => 'pending', 'score' => null, 'mock' => $isMock,
                 ];
                 if (!isset($histIdx[$g['id']])) { $history[] = $entry; $histIdx[$g['id']] = count($history) - 1; }
@@ -165,10 +173,10 @@ if (!empty($futCodes)) {
                     $lbl = ['c' => 'Córners esperados', 'y' => 'Amarillas esperadas', 'sot' => 'Remates a portería esperados', 'f' => 'Faltas esperadas'];
                     foreach ($lbl as $k => $l) if (isset($extra['exp'][$k])) $m['exp'][] = [$l, number_format($extra['exp'][$k][0], 1) . ' (' . number_format($extra['exp'][$k][1], 1) . ' – ' . number_format($extra['exp'][$k][2], 1) . ')'];
                     // el pronóstico publicado puede cambiar con los mercados nuevos
-                    $pick = best_pick(array_merge($fullMk[$m['id']] ?? [], $extra['markets']), $th);
+                    $pick = best_pick($fullMk[$m['id']] ?? [], $th, 'futbol');
                     if ($pick && $m['ts'] > $now) {
                         $entry = ['id' => $m['id'], 'sport' => 'futbol', 'league' => $m['league'], 'ts' => $m['ts'],
-                            'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'r' => $pick['r'],
+                            'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
                             'status' => 'pending', 'score' => null, 'mock' => $isMock, 'et' => $m['et'], 'lgc' => $m['lgc']];
                         if (!isset($histIdx[$m['id']])) { $history[] = $entry; $histIdx[$m['id']] = count($history) - 1; }
                         elseif ($history[$histIdx[$m['id']]]['status'] === 'pending') $history[$histIdx[$m['id']]] = $entry;
@@ -235,6 +243,7 @@ if (!$matches && !empty($GLOBALS['UMBRAL_ERRORS']) && is_file("$dataDir/pronosti
 file_put_contents("$dataDir/pronosticos.json.tmp", json_encode($out, JSON_UNESCAPED_UNICODE));
 rename("$dataDir/pronosticos.json.tmp", "$dataDir/pronosticos.json");
 }
+file_put_contents("$dataDir/calibracion.json", json_encode(['updated' => $now, 'cal' => aprender_calibracion($history), 'odds' => odds_activo()], JSON_UNESCAPED_UNICODE));
 file_put_contents("$dataDir/historial.json.tmp", json_encode($history, JSON_UNESCAPED_UNICODE));
 rename("$dataDir/historial.json.tmp", "$dataDir/historial.json");
 

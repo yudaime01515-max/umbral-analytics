@@ -23,6 +23,7 @@ jobs:
           API_SPORTS_KEY: ${{ secrets.API_SPORTS_KEY }}
           FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
           PANDASCORE_KEY: ${{ secrets.PANDASCORE_KEY }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           UMBRAL_DATA_DIR: public/data
           UMBRAL_CACHE_DIR: /tmp/umbral-cache
           LIGAS_MAX_DAYS: "150"
