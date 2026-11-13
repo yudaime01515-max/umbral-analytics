@@ -119,7 +119,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 'lgc' => $league['code'] ?? null, 'hf' => $g['home_full'] ?? '', 'af' => $g['away_full'] ?? '',
                 'formH' => recent_form($finished, $g['home_id'], $draws), 'formA' => recent_form($finished, $g['away_id'], $draws),
                 'exp' => $model['exp'], 'dist' => $model['dist'],
-                'markets' => array_values(array_column(array_map(fn($m) => array_filter(['n' => $m['n'], 'p' => $m['p'], 'pub' => $m['pub'] ?: null, 'q' => $m['q'] ?? null, 'qe' => $m['qe'] ?? null], fn($v) => $v !== null), $model['markets']), null, 'n')),
+                'markets' => array_values(array_column(array_map(fn($m) => array_filter(['n' => $m['n'], 'p' => $m['p'], 'pub' => $m['pub'] ?: null, 'cov' => $m['cov'] ?? null, 'q' => $m['q'] ?? null, 'qe' => $m['qe'] ?? null], fn($v) => $v !== null), $model['markets']), null, 'n')),
             ];
             // Guarda en el historial el pronóstico publicado, solo antes de que empiece el partido
             if ($pick && $g['ts'] > $now) {

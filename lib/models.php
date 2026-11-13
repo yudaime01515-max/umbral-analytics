@@ -271,12 +271,12 @@ function best_pick(array $markets, float $th, ?string $sport = null): ?array
     $above = array_values(array_filter($markets, function ($m) use ($th, $conCuotas, $valorMin) {
         if ($m['p'] < $th || in_array($m['r'][0] ?? '', ['per', 'pp'], true)) return false;
         if (!($m['pub'] ?? false)) return false;
-        if ($conCuotas && empty($m['q'])) return false;                         // la casa no lo ofrece: no se publica
-        if ($valorMin !== null && $m['p'] * ($m['q'] ?? 0) < $valorMin) return false;
+        if ($conCuotas && !empty($m['cov']) && empty($m['q'])) return false;   // liga con cuotas y la casa no lo ofrece: no se publica
+        if ($valorMin !== null && !empty($m['cov']) && $m['p'] * ($m['q'] ?? 0) < $valorMin) return false;
         return true;
     }));
     if (!$above) return null;
-    if ($conCuotas) { usort($above, fn($a, $b) => ($b['p'] * $b['q']) <=> ($a['p'] * $a['q'])); return $above[0]; }
+    if ($conCuotas && count(array_filter($above, fn($m) => !empty($m['q']))) === count($above)) { usort($above, fn($a, $b) => ($b['p'] * $b['q']) <=> ($a['p'] * $a['q'])); return $above[0]; }
     usort($above, fn($a, $b) => $a['p'] <=> $b['p']);
     return $above[0];
 }
