@@ -237,7 +237,7 @@ if (empty($cfg['mock']) && is_file($prevPath)) {
 usort($matches, fn($a, $b) => $a['ts'] <=> $b['ts']);
 $out = [
     'brand' => $cfg['brand'], 'brand_short' => $cfg['brand_short'], 'contact' => $cfg['contact'],
-    'updated' => $now, 'timezone' => $cfg['timezone'], 'threshold' => $th,
+    'updated' => $now, 'live_checked' => time(), 'timezone' => $cfg['timezone'], 'threshold' => $th,
     'margin' => $cfg['bookmaker_margin'], 'mock' => !empty($cfg['mock']),
     'sports' => $sportsOut, 'matches' => $matches,
 ];
@@ -247,6 +247,10 @@ if (!$matches && !empty($GLOBALS['UMBRAL_ERRORS']) && is_file("$dataDir/pronosti
 } else {
 file_put_contents("$dataDir/pronosticos.json.tmp", json_encode($out, JSON_UNESCAPED_UNICODE));
 rename("$dataDir/pronosticos.json.tmp", "$dataDir/pronosticos.json");
+// Archivo pequeño con los esports en vivo (la página lo consulta cada 45 s)
+$vivo = ['t' => time(), 'm' => []];
+foreach ($matches as $vm) if (!empty($vm['lv']) && isset($vm['mp'])) $vivo['m'][$vm['id']] = ['lv' => $vm['lv'], 'markets' => $vm['markets']];
+file_put_contents("$dataDir/vivo.json", json_encode($vivo, JSON_UNESCAPED_UNICODE));
 }
 file_put_contents("$dataDir/cerebro.json", json_encode(cerebro_aprender($history, "$dataDir/cerebro.json", $now), JSON_UNESCAPED_UNICODE));
 file_put_contents("$dataDir/calibracion.json", json_encode(['updated' => $now, 'cal' => aprender_calibracion($history), 'odds' => odds_activo()], JSON_UNESCAPED_UNICODE));
