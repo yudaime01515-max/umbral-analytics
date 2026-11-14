@@ -1714,7 +1714,7 @@ function loadLiveDetail(m){
 }
 function esportsBox(m){
   var L=m.lv,html='';
-  if(L&&liveState(m)==='live')html+='<div class="lv-head"><span class="live-pill">EN VIVO</span><span class="lv-clock">'+esc(L.txt||'')+'</span><span class="lv-upd">Marcador de mapas · se actualiza cada 10 min</span></div>'+
+  if(L&&liveState(m)==='live')html+='<div class="lv-head"><span class="live-pill">EN VIVO</span><span class="lv-clock">'+esc(L.txt||'')+'</span><span class="lv-upd">Marcador de mapas · se revisa cada 3 a 5 min</span></div>'+
     '<div class="lv-score"><div><span>'+esc(m.home)+'</span><b>'+esc(String(L.hs))+'</b></div><div><span>'+esc(m.away)+'</span><b>'+esc(String(L.as))+'</b></div></div>'+
     '<p class="cap" style="margin:0">Los mercados de arriba ya están recalculados desde este marcador; lo que ya quedó decidido no se muestra.</p>';
   if(m.stream&&/^https:\/\//.test(m.stream))html+='<p style="margin:10px 0 0"><a class="stream-btn" href="'+esc(m.stream)+'" target="_blank" rel="noopener">▶ Ver la transmisión</a></p>';
@@ -1759,12 +1759,32 @@ function boot(){
   DAYS=Object.keys(keys).sort().slice(0,4);if(!DAYS.length)DAYS=[today];
   document.getElementById('heroDate').textContent=new Date().toLocaleDateString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
   document.getElementById('navPl').hidden=DATA.mock||!(SPORT_BY.basquet||SPORT_BY.futbol);
-  applyLv();renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,60000);
+  applyLv();renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,180000);pollVivo();clearInterval(vivoTimer);vivoTimer=setInterval(pollVivo,45000);
 }
 document.getElementById('year').textContent=new Date().getFullYear();
 // Esports: el marcador viene dentro de los datos (lv). Se recargan los datos cada 2 min mientras haya partidas en juego.
 function applyLv(){(DATA.matches||[]).forEach(function(m){if(m.lv&&!espnPath(m))LIVE[m.id]=m.lv;});}
-var dataTimer=null;
+var dataTimer=null,vivoTimer=null,V_LAST=null;
+// Esports en vivo: archivo pequeño (vivo.json) que se consulta cada 45 s en las dos fuentes; gana la más reciente
+function applyVivo(v){
+  var ch=false;
+  if(!v||!v.m||v.t<(DATA.updated||0)-60)return ch;        // los pronósticos completos ya son más nuevos
+  DATA.live_checked=Math.max(DATA.live_checked||0,v.t);
+  DATA.matches.forEach(function(m){var e=v.m[m.id];if(!e||espnPath(m))return;if(JSON.stringify(m.lv)!==JSON.stringify(e.lv)){m.lv=e.lv;m.markets=e.markets;ch=true;}});
+  return ch;
+}
+function pollVivo(){
+  if(!DATA)return;var now=Date.now()/1000;
+  if(!DATA.matches.some(function(m){return !espnPath(m)&&m.ts<=now+600&&liveState(m)!=='done';}))return;
+  var get=function(base){return fetch(base+'vivo.json?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});};
+  Promise.all([get('data/'),REMOTE_DATA?get(REMOTE_DATA):null]).then(function(r){
+    var v=null;r.forEach(function(x){if(x&&x.t&&(!v||x.t>v.t))v=x;});
+    if(!v||(V_LAST&&v.t<=V_LAST.t))return;V_LAST=v;
+    var ch=applyVivo(v);applyLv();
+    if(!overlay.classList.contains('on'))renderPicks();
+    else if(ch&&typeof CUR_DETAIL!=='undefined'&&CUR_DETAIL&&v.m[CUR_DETAIL])openDetail(CUR_DETAIL);
+  });
+}
 function refreshData(){
   var now=Date.now()/1000,need=DATA&&DATA.matches.some(function(m){return !espnPath(m)&&m.ts<=now+600&&liveState(m)!=='done';});
   if(!need)return;
@@ -1773,7 +1793,7 @@ function refreshData(){
     DATA.matches=DATA.matches.map(function(m){return (!espnPath(m)&&nw[m.id])?nw[m.id]:m;});
     var have={};DATA.matches.forEach(function(m){have[m.id]=1;});
     d.matches.forEach(function(m){if(!have[m.id]&&!espnPath(m))DATA.matches.push(m);});
-    DATA.live_checked=d.live_checked;applyLv();if(!overlay.classList.contains('on'))renderPicks();
+    DATA.live_checked=Math.max(DATA.live_checked||0,d.live_checked||0);DATA.updated=d.updated;if(V_LAST)applyVivo(V_LAST);applyLv();if(!overlay.classList.contains('on'))renderPicks();
   }).catch(function(){});
 }
 function startApp(){

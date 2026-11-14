@@ -72,11 +72,15 @@ foreach (array_keys($need) as $sk) {
         }
     }
 }
-// Se guarda si algo cambió, o cada ~9 min mientras haya partidas en juego (así la página sabe que el marcador está revisado)
-if ($changed || ($enJuego && $now - (int)($data['live_checked'] ?? 0) >= 540)) {
+// Se guarda si algo cambió, o cada ~4 min mientras haya partidas en juego (así la página sabe que el marcador está revisado)
+if ($changed || ($enJuego && $now - (int)($data['live_checked'] ?? 0) >= 240)) {
     $data['live_checked'] = $now;
     if ($changed) $data['live_updated'] = $now;
     file_put_contents("$path.tmp", json_encode($data, JSON_UNESCAPED_UNICODE));
     rename("$path.tmp", $path);
+    // Archivo pequeño solo con lo que está en vivo: la página lo consulta cada 45 s sin bajar todos los pronósticos
+    $vivo = ['t' => $now, 'm' => []];
+    foreach ($data['matches'] as $m) if (isset($games[$m['sport']]) && !empty($m['lv']) && $m['ts'] > $now - 8 * 3600) $vivo['m'][$m['id']] = ['lv' => $m['lv'], 'markets' => $m['markets']];
+    file_put_contents("$dataDir/vivo.json", json_encode($vivo, JSON_UNESCAPED_UNICODE));
 }
 echo "Partidas en vivo actualizadas: $changed (en juego: $enJuego)\n";
