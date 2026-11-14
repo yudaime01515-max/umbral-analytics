@@ -976,7 +976,7 @@ function nowCands(){
     if(state.sport!=='all'&&f.sport!==state.sport)return;
     var st=liveState(f),live=st==='live',soon=st==='pre'&&f.ts-now<=3*3600;
     if(!live&&!soon)return;
-    var es=ES_SPORTS.indexOf(f.sport)>=0,fut=live&&isLiveMk(f),esl=live&&es&&f.lv&&f.lv.state==='in';
+    var es=ES_SPORTS.indexOf(f.sport)>=0,fut=live&&isLiveMk(f),esl=live&&es&&f.lv&&f.lv.state==='in'&&DATA.live_checked&&now-DATA.live_checked<900;   // marcador revisado hace menos de 15 min
     // en vivo solo vale si la probabilidad se recalculó con lo que está pasando; si no, el dato de antes ya no sirve
     if(live&&!fut&&!esl)return;
     if(fut&&LIVE_MK[f.id].t>82)return;                     // al final casi no quedan mercados abiertos
@@ -1000,7 +1000,7 @@ function nowWhy(c){
   if(c.fut){var t=Math.round(LIVE_MK[f.id].t),L=LIVE[f.id];
     w.push('Minuto '+t+"'"+(L?', van '+esc(String(L.hs))+' – '+esc(String(L.as)):'')+'.');
     if(c.pre!=null&&Math.abs(m.p-c.pre)>=0.03)w.push('Antes del partido estaba en '+pct(c.pre)+'% y ahora en <b>'+pct(m.p)+'%</b> por cómo va el juego.');
-  }else if(c.live){var l=f.lv||{};w.push('Recalculado con el marcador en vivo ('+esc(String(l.hs))+' – '+esc(String(l.as))+(l.txt?', '+esc(l.txt):'')+').');}
+  }else if(c.live){var l=f.lv||{},ago=Math.max(0,Math.round((now-(DATA.live_checked||now))/60));w.push('Recalculado con el marcador en vivo ('+esc(String(l.hs))+' – '+esc(String(l.as))+(l.txt?', '+esc(l.txt):'')+'), revisado hace '+(ago<1?'menos de 1':ago)+' min.');}
   else{var mins=Math.max(1,Math.round((f.ts-now)/60));w.push('Empieza en '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min')+'.');}
   if(c.g)w.push('Este tipo de jugada acertó <b>'+c.g.ok+' de '+c.g.n+'</b> ('+Math.round(c.g.real*100)+'%) en el historial.');
   return w.join(' ');
@@ -1021,7 +1021,7 @@ function renderNow(){
       '<div class="ah-p"><span class="n num">'+pct(top.m.p)+'<small>%</small></span><span class="ah-lvl '+lv[1]+'">'+lv[0]+'</span>'+
       '<span class="ah-min">Juégala solo si tu casa paga<br><b>'+fair(top.m.p)+'</b> o más</span></div></button>'+
     (rest.length?'<div class="ah-list">'+rest.map(function(x){return '<button class="ah-row" data-id="'+esc(x.f.id)+'"><span><span class="m">'+esc(x.m.n)+'</span><span class="t">'+tag(x)+' '+esc(x.f.home)+' vs '+esc(x.f.away)+'</span></span><span class="r"><b>'+pct(x.m.p)+'%</b>paga ≥ '+fair(x.m.p)+'</span></button>';}).join('')+'</div>':'')+
-    '<div class="ah-foot">'+(anyLive?'Fútbol se recalcula cada 30 segundos y esports cada 10 minutos, con el marcador real. ':'Ahora no hay partidos en vivo con datos suficientes; cuando empiecen, este recuadro cambia solo. ')+
+    '<div class="ah-foot">'+(anyLive?'Fútbol se recalcula cada 30 segundos y esports cada 3 a 5 minutos, con el marcador real. Si el marcador de una partida de esports lleva más de 15 minutos sin revisarse, deja de recomendarse. ':'Ahora no hay partidos en vivo con datos suficientes; cuando empiecen, este recuadro cambia solo. ')+
     'Si tu casa paga menos que la cuota indicada, <strong>no la juegues</strong>: ahí ya no conviene. Una unidad = 1% a 2% de lo que tienes para apostar. Es una probabilidad, no una fija.</div>';
   box.hidden=false;
 }
@@ -1759,7 +1759,7 @@ function boot(){
   DAYS=Object.keys(keys).sort().slice(0,4);if(!DAYS.length)DAYS=[today];
   document.getElementById('heroDate').textContent=new Date().toLocaleDateString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
   document.getElementById('navPl').hidden=DATA.mock||!(SPORT_BY.basquet||SPORT_BY.futbol);
-  applyLv();renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,120000);
+  applyLv();renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,60000);
 }
 document.getElementById('year').textContent=new Date().getFullYear();
 // Esports: el marcador viene dentro de los datos (lv). Se recargan los datos cada 2 min mientras haya partidas en juego.
@@ -1773,7 +1773,7 @@ function refreshData(){
     DATA.matches=DATA.matches.map(function(m){return (!espnPath(m)&&nw[m.id])?nw[m.id]:m;});
     var have={};DATA.matches.forEach(function(m){have[m.id]=1;});
     d.matches.forEach(function(m){if(!have[m.id]&&!espnPath(m))DATA.matches.push(m);});
-    applyLv();if(!overlay.classList.contains('on'))renderPicks();
+    DATA.live_checked=d.live_checked;applyLv();if(!overlay.classList.contains('on'))renderPicks();
   }).catch(function(){});
 }
 function startApp(){

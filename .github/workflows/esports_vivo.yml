@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: actualizar
+  group: esports-vivo
   cancel-in-progress: false
 
 jobs:
@@ -25,13 +25,18 @@ jobs:
         run: |
           git config user.name "umbral-bot"
           git config user.email "umbral-bot@users.noreply.github.com"
-          for i in 1 2 3; do
+          # GitHub lanza esta tarea cada ~35 min en la práctica, así que cada vez se queda
+          # revisando el marcador cada 2 minutos y medio durante 33 minutos.
+          fin=$((SECONDS+1980))
+          while :; do
             git fetch -q origin main && git reset -q --hard origin/main
-            php esports_live.php
-            git diff --quiet -- public/data && { echo "Sin cambios"; exit 0; }
-            git add public/data
-            git commit -q -m "Esports en vivo"
-            git push -q origin HEAD:main && exit 0
-            echo "Otro guardado se cruzó, reintento $i"; sleep 5
+            out=$(php esports_live.php); echo "$out"
+            case "$out" in *"Sin partidas"*|*"Nada que hacer"*) exit 0;; esac
+            if ! git diff --quiet -- public/data; then
+              git add public/data
+              git commit -q -m "Esports en vivo"
+              git push -q origin HEAD:main || echo "Otro guardado se cruzó, se reintenta en la próxima vuelta"
+            fi
+            [ $SECONDS -ge $fin ] && break
+            sleep 150
           done
-          exit 1
