@@ -634,7 +634,8 @@ nav.views a[aria-current="page"]::after{
       <span class="sub" id="boardSub"></span>
     </div>
     <div id="slip"></div>
-    <div class="note" id="comboNote" style="margin-bottom:14px"></div>
+    <div class="note" id="brainNote" style="margin:0 0 10px" hidden></div>
+    <div class="note" id="comboNote" style="margin:0 0 14px"></div>
     <div class="picks" id="picks"><div class="loading">Cargando pronósticos…</div></div>
 
     <div class="note">
@@ -836,7 +837,23 @@ var ICON={
 function icon(k,size){return '<svg width="'+(size||16)+'" height="'+(size||16)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICON[k]||ICON.futbol)+'</svg>';}
 
 var DATA=null,HIST=[],SPORT_BY={},DAYS=[],TZ='America/Lima';
-var ODDS_ON=false,CAL=null,SLIP={};
+var ODDS_ON=false,CAL=null,SLIP={},BRAIN=null;
+var MK_TYPE={sets_one:'gana al menos un mapa o set',res:'ganador',tot:'más/menos',dc:'doble oportunidad',hcp:'hándicap',st:'córners, tarjetas y remates',tscore:'equipo marca',btts:'ambos marcan'};
+function renderBrain(){
+  var el=document.getElementById('brainNote');if(!el)return;
+  if(!BRAIN){el.hidden=true;return;}
+  var B=BRAIN,mins=Math.max(0,Math.round((Date.now()/1000-B.updated)/60)),ago=mins<60?mins+' min':Math.round(mins/60)+' h',h='<strong>Cerebro de Umbral.</strong> ';
+  if(!B.activo){h+='Lleva '+B.n+' pronósticos cerrados estudiados. '+(B.examen&&B.examen.mejor==='crudo'?'En su último examen corregir no mejoraba los aciertos, así que hoy deja las probabilidades tal como salen del modelo.':'Aún necesita más resultados para empezar a corregir.');}
+  else{
+    h+='Aprendió de <strong>'+B.n+'</strong> pronósticos cerrados y se reentrenó hace '+ago+'. ';
+    var a=B.examen&&B.examen.alto;
+    if(a&&a.n>=30)h+='En su examen con días que no había visto, lo que marcó 75% o más acertó <strong>'+a.ok+' de '+a.n+' ('+Math.round(a.ok/a.n*100)+'%)</strong>. ';
+    var L=(B.lecciones||[]).filter(function(x){return Math.abs(x.d)>=3;}).slice(0,3).map(function(x){var g=x.g.split('|'),sp=SPORT_BY[g[0]]||{name:g[0]};return esc(sp.name)+' · '+(MK_TYPE[g[1]]||g[1])+' <strong>'+(x.d>0?'+':'−')+Math.abs(x.d).toFixed(1)+' pts</strong>';});
+    if(L.length)h+='Lo que más corrigió: '+L.join(', ')+'. ';
+    h+='Todas las probabilidades que ves ya pasan por él.';
+  }
+  el.innerHTML='<b class="tag">IA</b><div>'+h+'</div>';el.hidden=false;
+}
 function slipMark(){document.querySelectorAll('#picks .pick').forEach(function(b){b.classList.toggle('sel',!!SLIP[b.dataset.id]);});slipRender();}
 function slipRender(){var el=document.getElementById('slip'),ids=Object.keys(SLIP);if(!ids.length){el.style.display='none';return;}
   var pr=1,qq=1,allQ=true,est=false;ids.forEach(function(k){var x=SLIP[k];pr*=x.p;if(x.q){qq*=x.q;if(x.qe)est=true;}else allQ=false;});
@@ -918,7 +935,7 @@ function renderPicks(){
   (function(){var el=document.getElementById('comboNote');if(!el)return;var g=CAL&&CAL.global,r=g&&g.n>=20?g.real:null,p=r!==null?r:Math.max(th,0.7),f=function(n){return Math.round(Math.pow(p,n)*100);};
     el.innerHTML='<b class="tag">OJO</b><div><strong>Cada pronóstico se juega solo.</strong> '+(r!==null?'Hasta hoy Umbral acertó <strong>'+Math.round(r*100)+'%</strong> de '+g.n+' pronósticos cerrados (el modelo ya se corrige con eso). ':'')+'Si juntas varios en una combinada, la probabilidad se multiplica y cae rápido: con '+Math.round(p*100)+'% cada uno, <strong>2 juntos aciertan '+f(2)+'%, 3 juntos '+f(3)+'%, 5 juntos '+f(5)+'%</strong>. Ninguna probabilidad es una fija.'+(ODDS_ON?'':' Las cuotas de casas aún no están conectadas: confirma que tu casa ofrezca el mercado antes de apostar.')+'</div>';})();
   document.getElementById('boardSub').textContent=state.all?(rows.length+(rows.length===1?' partido':' partidos')+' · '+matchesWith+' superan '+pct(th)+'%'):(rows.length+(rows.length===1?' partido':' partidos')+' con al menos un mercado sobre '+pct(th)+'%');
-  renderSports(counts);renderCombos(list);renderNow();
+  renderSports(counts);renderCombos(list);renderNow();renderBrain();
   if(!list.length){elPicks.innerHTML='<div class="empty"><strong>No hay partidos programados para este día</strong>Prueba con otro día o revisa más tarde.</div>';return;}
   if(!rows.length){elPicks.innerHTML='<div class="empty"><strong>Ningún partido supera '+pct(th)+'% con estos filtros</strong>Baja el umbral en la regla, cambia de deporte o de día.</div>';return;}
   elPicks.innerHTML=rows.map(function(r){var f=r.f,m=r.pk.market,sp=SPORT_BY[f.sport]||{name:f.sport};
@@ -1800,8 +1817,9 @@ function startApp(){
   Promise.all([
     loadJSON('pronosticos.json',false),
     loadJSON('historial.json',true).catch(function(){return [];}),
-    loadJSON('calibracion.json',true).catch(function(){return null;})
-  ]).then(function(res){DATA=res[0];HIST=res[1]||[];CAL=(res[2]&&res[2].cal)||null;ODDS_ON=!!(res[2]&&res[2].odds);boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
+    loadJSON('calibracion.json',true).catch(function(){return null;}),
+    loadJSON('cerebro.json',true).catch(function(){return null;})
+  ]).then(function(res){DATA=res[0];HIST=res[1]||[];CAL=(res[2]&&res[2].cal)||null;ODDS_ON=!!(res[2]&&res[2].odds);BRAIN=(res[3]&&res[3].n)?res[3]:null;boot();}).catch(function(e){showError(e.message||'Error de red.');route();});
 }
 /* ---------- acceso con código: la lista está en data/acceso.json (se edita en GitHub sin gastar créditos) ---------- */
 (function(){

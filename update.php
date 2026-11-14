@@ -15,6 +15,7 @@ require "$root/lib/espn_ligas.php";
 require "$root/lib/esports.php";
 require "$root/lib/aprendizaje.php";
 require "$root/lib/cuotas.php";
+require "$root/lib/cerebro.php";
 
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
@@ -46,6 +47,10 @@ $histIdx = [];
 foreach ($history as $i => $h) $histIdx[$h['id']] = $i;
 // El modelo aprende: corrige sus probabilidades con lo que acertó y falló hasta hoy
 $CAL = aprender_calibracion($history);
+// Cerebro: modelo que se reentrena con todos los pronósticos cerrados y se examina solo una vez al día
+$CEREBRO = cerebro_aprender($history, "$dataDir/cerebro.json", $now);
+file_put_contents("$dataDir/cerebro.json", json_encode($CEREBRO, JSON_UNESCAPED_UNICODE));
+$CAL['w'] = $CEREBRO['activo'] ? $CEREBRO['w'] : null;
 
 $matches = [];
 $futCodes = [];
@@ -243,6 +248,7 @@ if (!$matches && !empty($GLOBALS['UMBRAL_ERRORS']) && is_file("$dataDir/pronosti
 file_put_contents("$dataDir/pronosticos.json.tmp", json_encode($out, JSON_UNESCAPED_UNICODE));
 rename("$dataDir/pronosticos.json.tmp", "$dataDir/pronosticos.json");
 }
+file_put_contents("$dataDir/cerebro.json", json_encode(cerebro_aprender($history, "$dataDir/cerebro.json", $now), JSON_UNESCAPED_UNICODE));
 file_put_contents("$dataDir/calibracion.json", json_encode(['updated' => $now, 'cal' => aprender_calibracion($history), 'odds' => odds_activo()], JSON_UNESCAPED_UNICODE));
 file_put_contents("$dataDir/historial.json.tmp", json_encode($history, JSON_UNESCAPED_UNICODE));
 rename("$dataDir/historial.json.tmp", "$dataDir/historial.json");
