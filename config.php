@@ -38,7 +38,7 @@ return [
     // res = ganador, dc = doble oportunidad, tot = más/menos, btts = ambos marcan, hcp = hándicap.
     // Se quitan: marcador exacto en sets, "gana al menos un set", córners/tarjetas, totales por equipo, por periodos.
     'publicables' => [
-        'default' => ['res', 'dc', 'tot', 'btts', 'hcp'],
+        'default' => ['res', 'dc', 'tot', 'btts', 'hcp', 'sets_one'],   // sets_one = gana al menos un mapa (esports): 79% de acierto en CS2
         'tenis'   => ['res', 'tot'],
     ],
 
