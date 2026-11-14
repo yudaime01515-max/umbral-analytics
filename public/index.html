@@ -180,6 +180,8 @@ nav.views a:hover{color:var(--text)}
 .ah-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--text)}
 .ah-row .m{font-weight:700;font-size:14.5px}.ah-row .t{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
 .ah-row .r{text-align:right;font-family:var(--mono);font-size:12px;color:var(--muted)}.ah-row .r b{display:block;font-size:20px;color:var(--text)}
+.drec{margin:12px 0;padding:14px 16px;border-radius:14px;border:1px solid rgba(255,90,54,.45);background:linear-gradient(160deg,rgba(255,90,54,.10),transparent 70%),var(--bg)}
+.drec-m{font-family:var(--display);font-weight:800;font-size:24px;text-transform:uppercase;margin:4px 0 6px}
 .ah-foot{font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.45}
 @media (max-width:560px){.ah-top{grid-template-columns:1fr}.ah-p{flex-direction:row;align-items:center;justify-content:space-between}.ah-min{text-align:left}}
 .combos{margin:6px 0 22px;padding:20px;border-radius:20px;background:linear-gradient(160deg,rgba(255,90,54,.10),rgba(255,90,54,0) 55%),var(--panel);border:1px solid rgba(255,90,54,.35)}
@@ -783,6 +785,7 @@ nav.views a[aria-current="page"]::after{
     </div>
     <div class="d-body">
       <div id="dLive" class="lv" hidden></div>
+      <div id="dRec" class="drec" hidden></div>
       <div class="d-facts" id="dFacts"></div>
       <div id="dViz" class="nbaviz" hidden></div>
       <div id="dPlayers" hidden></div>
@@ -987,29 +990,36 @@ function comboHTML(f){
 /* ---------- Métele ahora: la mejor jugada del momento, recalculada en vivo ---------- */
 var ES_SPORTS=['cs2','dota2','lol','valorant','r6','ow','mlbb','sc2'];
 function calGroup(sport,type){var g=CAL&&CAL.grupos&&type?CAL.grupos[sport+'|'+type]:null;return g&&g.n>=8?g:null;}
+// Mejor opción de un partido. Devuelve null si no hay nada que valga, o {stale:true} si en vivo no hay datos recalculados
+function recFor(f,floor){
+  var now=Date.now()/1000,st=liveState(f),live=st==='live';
+  if(st==='done')return null;
+  var es=ES_SPORTS.indexOf(f.sport)>=0,fut=live&&isLiveMk(f),esl=live&&es&&f.lv&&f.lv.state==='in'&&DATA.live_checked&&now-DATA.live_checked<900;   // marcador revisado hace menos de 15 min
+  // en vivo solo vale si la probabilidad se recalculó con lo que está pasando; si no, el dato de antes ya no sirve
+  if(live&&!fut&&!esl)return {stale:true};
+  if(fut&&LIVE_MK[f.id].t>82)return {stale:true,late:true};   // al final casi no quedan mercados abiertos
+  var pre={};f.markets.forEach(function(m){pre[m.n]=m.p;});
+  var best=null;
+  mkOf(f).forEach(function(m){
+    if(m.p<floor||m.p>0.92)return;                         // más de 92% no paga nada
+    var g=calGroup(f.sport,m.r&&m.r[0]);
+    if(!live&&!es&&m.pub!==true)return;
+    if(!best||m.p>best.sc)best={f:f,m:m,sc:m.p,g:g,live:live,fut:fut,pre:pre[m.n],weak:m.p<0.72};
+  });
+  return best;
+}
 function nowCands(){
   var now=Date.now()/1000,out=[];
   (DATA.matches||[]).forEach(function(f){
     if(state.sport!=='all'&&f.sport!==state.sport)return;
     var st=liveState(f),live=st==='live',soon=st==='pre'&&f.ts-now<=3*3600;
     if(!live&&!soon)return;
-    var es=ES_SPORTS.indexOf(f.sport)>=0,fut=live&&isLiveMk(f),esl=live&&es&&f.lv&&f.lv.state==='in'&&DATA.live_checked&&now-DATA.live_checked<900;   // marcador revisado hace menos de 15 min
-    // en vivo solo vale si la probabilidad se recalculó con lo que está pasando; si no, el dato de antes ya no sirve
-    if(live&&!fut&&!esl)return;
-    if(fut&&LIVE_MK[f.id].t>82)return;                     // al final casi no quedan mercados abiertos
-    var pre={};f.markets.forEach(function(m){pre[m.n]=m.p;});
-    var best=null;
-    mkOf(f).forEach(function(m){
-      if(m.p<0.72||m.p>0.92)return;                        // menos de 72% es moneda al aire; más de 92% no paga nada
-      var g=calGroup(f.sport,m.r&&m.r[0]);
-      if(g&&g.real<0.68)return;                            // este tipo de jugada viene fallando en el historial
-      if(!live&&!es&&m.pub!==true)return;
-      var sc=m.p+(g?Math.max(-0.05,Math.min(0.05,g.real-g.pred)):0);
-      if(!best||sc>best.sc)best={f:f,m:m,sc:sc,g:g,live:live,fut:fut,pre:pre[m.n]};
-    });
-    if(best)out.push(best);
+    var c=recFor(f,live?0.5:0.72);                         // en vivo se muestra siempre la mejor opción, aunque sea "espera"
+    if(c&&!c.stale)out.push(c);
   });
-  out.sort(function(a,b){return (b.live-a.live)||(b.sc-a.sc);});
+  // primero lo jugable en vivo, luego lo que empieza pronto, al final lo que está en vivo pero sin jugada clara
+  var rank=function(c){return c.weak?2:c.live?0:1;};
+  out.sort(function(a,b){return (rank(a)-rank(b))||(b.sc-a.sc);});
   return out;
 }
 function nowWhy(c){
@@ -1022,23 +1032,32 @@ function nowWhy(c){
   if(c.g)w.push('Este tipo de jugada acertó <b>'+c.g.ok+' de '+c.g.n+'</b> ('+Math.round(c.g.real*100)+'%) en el historial.');
   return w.join(' ');
 }
-function nowLvl(p){return p>=0.85?['Fuerte · 2 unidades','']:p>=0.78?['Buena · 1 unidad','b']:['Arriesgada · media unidad','c'];}
+function renderRec(f){
+  var el=document.getElementById('dRec');if(!el)return;
+  var c=recFor(f,0.5),h='<span class="ah-k">Qué jugar en este partido</span>';
+  if(!c){el.hidden=true;return;}
+  if(c.stale)h+='<div class="ah-why">'+(c.late?'El partido está por terminar: ya no conviene entrar.':'Este partido está en juego y sus probabilidades no se recalculan en vivo'+(ES_SPORTS.indexOf(f.sport)>=0?' (el marcador lleva más de 15 minutos sin revisarse)':'')+'. Lo que ves abajo es de antes del partido: no lo uses para apostar ahora.')+'</div>';
+  else if(c.weak)h+='<div class="drec-m">Espera</div><div class="ah-why">No hay jugada clara todavía. La opción más probable es <b>'+esc(c.m.n)+'</b> con '+pct(c.m.p)+'%, por debajo del mínimo de 72%. '+nowWhy(c)+'</div>';
+  else{var lv=nowLvl(c.m.p);h+='<div class="drec-m">'+esc(c.m.n)+' <span class="num">'+pct(c.m.p)+'%</span></div><div class="ah-g"><span class="ah-lvl '+lv[1]+'">'+lv[0]+'</span><span>Juégala solo si tu casa paga <b class="num" style="color:var(--text)">'+fair(c.m.p)+'</b> o más</span></div><div class="ah-why">'+nowWhy(c)+'</div>';}
+  el.innerHTML=h;el.hidden=false;
+}
+function nowLvl(p){return p>=0.85?['Fuerte · 2 unidades','']:p>=0.78?['Buena · 1 unidad','b']:p>=0.72?['Arriesgada · media unidad','c']:['Sin jugada clara · espera','c'];}
 function renderNow(){
   var box=document.getElementById('ahora');if(!box||!DATA)return;
   var c=nowCands();
   if(!c.length){box.hidden=true;box.innerHTML='';return;}
-  var anyLive=c[0].live,top=c[0],rest=c.slice(1,7),lv=nowLvl(top.m.p),sp=SPORT_BY[top.f.sport]||{name:top.f.sport};
+  var hasTop=!c[0].weak,anyLive=c[0].live&&hasTop,liveN=c.filter(function(x){return x.live;}).length,top=c[0],others=c.filter(function(x,i){return !(hasTop&&i===0);}),liveRows=others.filter(function(x){return x.live;}).slice(0,8),rest=liveRows.concat(others.filter(function(x){return !x.live;}).slice(0,Math.max(3,9-liveRows.length))),lv=nowLvl(top.m.p),sp=SPORT_BY[top.f.sport]||{name:top.f.sport};
   var tag=function(x){return x.live?'<span class="live-pill">EN VIVO</span>':'<span class="live-pill pre">'+timeStr(x.f.ts)+'</span>';};
-  box.innerHTML='<div class="ah-head"><h2>'+(anyLive?'Métele ahora':'Lo mejor que empieza pronto')+'</h2>'+(anyLive?'<span class="live-pill">EN VIVO</span>':'')+
+  box.innerHTML='<div class="ah-head"><h2>'+(anyLive?'Métele ahora':hasTop?'Lo mejor que empieza pronto':'Ahora mismo, espera')+'</h2>'+(liveN?'<span class="live-pill">'+liveN+' EN VIVO</span>':'')+
     '<span class="ah-upd">Revisado '+new Date().toLocaleTimeString('es-PE',{timeZone:TZ,hour:'2-digit',minute:'2-digit',second:'2-digit'})+' · se recalcula solo</span></div>'+
-    '<button class="ah-top" data-id="'+esc(top.f.id)+'"><div style="min-width:0"><span class="ah-k">'+(top.live?'La mejor jugada en este momento':'La mejor jugada de las próximas 3 horas')+'</span>'+
+    (!hasTop?'<div class="ah-why" style="margin:0 0 4px"><strong>Ninguna partida en vivo tiene una jugada clara en este momento.</strong> Abajo ves la opción más probable de cada una; cuando alguna pase de 72% este recuadro te la pone arriba.</div>':'<button class="ah-top" data-id="'+esc(top.f.id)+'"><div style="min-width:0"><span class="ah-k">'+(top.live?'La mejor jugada en este momento':'La mejor jugada de las próximas 3 horas')+'</span>'+
       '<div class="ah-m">'+esc(top.m.n)+'</div>'+
       '<div class="ah-g">'+tag(top)+'<span>'+esc(top.f.home)+' vs '+esc(top.f.away)+'</span><span>·</span><span>'+esc(sp.name)+'</span></div>'+
       '<div class="ah-why">'+nowWhy(top)+'</div></div>'+
       '<div class="ah-p"><span class="n num">'+pct(top.m.p)+'<small>%</small></span><span class="ah-lvl '+lv[1]+'">'+lv[0]+'</span>'+
-      '<span class="ah-min">Juégala solo si tu casa paga<br><b>'+fair(top.m.p)+'</b> o más</span></div></button>'+
-    (rest.length?'<div class="ah-list">'+rest.map(function(x){return '<button class="ah-row" data-id="'+esc(x.f.id)+'"><span><span class="m">'+esc(x.m.n)+'</span><span class="t">'+tag(x)+' '+esc(x.f.home)+' vs '+esc(x.f.away)+'</span></span><span class="r"><b>'+pct(x.m.p)+'%</b>paga ≥ '+fair(x.m.p)+'</span></button>';}).join('')+'</div>':'')+
-    '<div class="ah-foot">'+(anyLive?'Fútbol se recalcula cada 30 segundos y esports cada 3 a 5 minutos, con el marcador real. Si el marcador de una partida de esports lleva más de 15 minutos sin revisarse, deja de recomendarse. ':'Ahora no hay partidos en vivo con datos suficientes; cuando empiecen, este recuadro cambia solo. ')+
+      '<span class="ah-min">Juégala solo si tu casa paga<br><b>'+fair(top.m.p)+'</b> o más</span></div></button>')+
+    (rest.length?'<div class="ah-list">'+rest.map(function(x){return '<button class="ah-row" data-id="'+esc(x.f.id)+'"><span><span class="m">'+esc(x.m.n)+'</span><span class="t">'+tag(x)+' '+esc(x.f.home)+' vs '+esc(x.f.away)+'</span></span><span class="r"><b>'+pct(x.m.p)+'%</b>'+(x.weak?'espera':'paga ≥ '+fair(x.m.p))+'</span></button>';}).join('')+'</div>':'')+
+    '<div class="ah-foot">'+(anyLive?'Fútbol se recalcula cada 30 segundos y esports cada 3 a 5 minutos, con el marcador real. Si el marcador de una partida de esports lleva más de 15 minutos sin revisarse, deja de recomendarse. ':(liveN?'Las partidas en vivo salen abajo con su opción más probable. ':'Ahora no hay partidos en vivo con datos suficientes; cuando empiecen, este recuadro cambia solo. '))+
     'Si tu casa paga menos que la cuota indicada, <strong>no la juegues</strong>: ahí ya no conviene. Una unidad = 1% a 2% de lo que tienes para apostar. Es una probabilidad, no una fija.</div>';
   box.hidden=false;
 }
@@ -1114,7 +1133,7 @@ function openDetail(id){
   renderNbaViz(f);
   MK_F=f;MK_TAB=null;drawMarkets();
   renderDist(f.dist,f);
-  CUR_DETAIL=f.id;renderKeyPlayers(f);renderInjuries(f);startLiveDetail(f);
+  CUR_DETAIL=f.id;renderKeyPlayers(f);renderInjuries(f);startLiveDetail(f);renderRec(f);
   lastFocus=document.activeElement;overlay.classList.add('on');document.getElementById('dClose').focus();document.body.style.overflow='hidden';
 }
 /* ---------- pestañas de mercados (para no perderse cuando hay cientos) ---------- */
@@ -1678,7 +1697,7 @@ function liveMkRefresh(m,path){
     storeLiveMk(m,liveCalc(m,c,sd[0],sd[1]));if(!overlay.classList.contains('on'))renderPicks();}).catch(function(){});
 }
 function liveProbs(m,c,hT,aT){
-  var LC=liveCalc(m,c,hT,aT),t=LC.t,out=LC.out;storeLiveMk(m,LC);
+  var LC=liveCalc(m,c,hT,aT),t=LC.t,out=LC.out;storeLiveMk(m,LC);renderRec(m);
   // comparar con el pronóstico previo cuando existe el mismo mercado
   var preP={};(m.markets||[]).forEach(function(k){preP[k.n]=k.p;});
   var th=state.th,html='<h4 class="lv-team">📈 Probabilidades en vivo · min '+Math.round(t)+'\'</h4><p class="cap" style="margin:0">Se recalculan con lo que va del partido y el ritmo de juego de cada equipo (córners, remates, faltas, tarjetas, expulsiones). Se muestran las líneas que hoy superan tu umbral del '+pct(th)+'% y las más cercanas a él.</p>';

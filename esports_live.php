@@ -9,6 +9,8 @@ $cfg = require "$root/config.php";
 require "$root/lib/api.php";
 require "$root/lib/models.php";
 require "$root/lib/esports.php";
+require "$root/lib/aprendizaje.php";
+require "$root/lib/cerebro.php";
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
 date_default_timezone_set($cfg['timezone']);
 $dataDir = getenv('UMBRAL_DATA_DIR') ?: "$root/data";
@@ -18,6 +20,10 @@ define('UMBRAL_CACHE', getenv('UMBRAL_CACHE_DIR') ?: "$dataDir/cache");
 $path = "$dataDir/pronosticos.json";
 if (!getenv('PANDASCORE_KEY') || !is_file($path)) exit("Nada que hacer\n");
 $data = json_decode(file_get_contents($path), true);
+$GLOBALS['UMBRAL_CFG'] = $cfg;
+// El cerebro también corrige las probabilidades en vivo (con lo último que aprendió en la actualización de cada hora)
+$cb = is_file("$dataDir/cerebro.json") ? (json_decode((string)file_get_contents("$dataDir/cerebro.json"), true) ?: []) : [];
+$CAL = ['global' => ['adj' => 0], 'grupos' => [], 'w' => !empty($cb['activo']) ? $cb['w'] : null];
 $now = time();
 
 $games = [];
@@ -48,7 +54,7 @@ foreach (array_keys($need) as $sk) {
         if (!isset($byId[$m['id']]) || !isset($m['mp'])) continue;
         [$sa, $sb] = $byId[$m['id']]; $enJuego++;
         if (($m['lv']['hs'] ?? -1) === $sa && ($m['lv']['as'] ?? -1) === $sb) continue;
-        $m['markets'] = array_values(array_filter(ps_markets(ps_cond($m['mp'], $m['bo'], $m['bt'], $sa, $sb), $m['bo'], $m['bt'], $m['home'], $m['away']), fn($x) => $x['p'] > 0.005 && $x['p'] < 0.995));
+        $m['markets'] = calibrar_markets(array_values(array_filter(ps_markets(ps_cond(ps_live_s((float)$m['mp'], $m['el'] ?? null, $sa, $sb), $m['bo'], $m['bt'], $sa, $sb), $m['bo'], $m['bt'], $m['home'], $m['away']), fn($x) => $x['p'] > 0.005 && $x['p'] < 0.995)), $m['sport'], $CAL);
         $m['lv'] = ['hs' => $sa, 'as' => $sb, 'txt' => 'Mapa ' . min($m['bo'], $sa + $sb + 1), 'state' => 'in'];
         $changed++;
     }

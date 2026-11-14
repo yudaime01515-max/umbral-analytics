@@ -64,7 +64,8 @@ function calibrar_markets(array $markets, string $sport, array $cal, ?array $odd
         $m['p0'] = $m['p'];
         // Con el cerebro entrenado manda el cerebro; si aún no hay datos suficientes, la corrección simple de antes
         $m['p'] = !empty($cal['w']) && function_exists('cb_pred') && $type !== ''
-            ? round(min(CAL_P_MAX, cb_pred($cal['w'], $sport, $type, (float)$m['p'])), 4)
+            // (el cerebro aprendió de pronósticos altos; para lo que está bajo 50% se corrige su contrario, así los dos lados siguen sumando 100%)
+            ? round(min(CAL_P_MAX, $m['p'] >= 0.5 ? cb_pred($cal['w'], $sport, $type, (float)$m['p']) : 1 - cb_pred($cal['w'], $sport, $type, 1 - (float)$m['p'])), 4)
             : round(max(0.01, min(CAL_P_MAX, $m['p'] + cal_ajuste($sport, $type, $cal))), 4);
         $m['pub'] = in_array($type, $allowed, true);
         if ($odds !== null) $m['cov'] = true;   // liga con cobertura de cuotas: ahí sí se exige que la casa lo ofrezca

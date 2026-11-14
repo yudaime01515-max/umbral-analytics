@@ -75,6 +75,25 @@ function ps_scores(float $s, int $bo, string $type): array
     return set_scores($s, max(1, $bo));
 }
 
+/**
+ * Probabilidad por mapa durante la serie: el nivel (Elo) de los dos equipos se mueve con los mapas ya jugados
+ * en esta misma serie, igual que se mueve entre series. Quien gana un mapa demuestra estar mejor hoy.
+ * $el = [elo local, elo visita, mapas en la base local, mapas en la base visita]
+ */
+function ps_live_s(float $s0, ?array $el, int $sa, int $sb): float
+{
+    if (!$el || count($el) < 4 || $sa + $sb <= 0) return $s0;
+    [$ea, $eb, $na, $nb] = [(float)$el[0], (float)$el[1], (int)$el[2], (int)$el[3]];
+    for ($k = 0; $k < $sa + $sb; $k++) {
+        $res = $k < $sa ? 1 : 0;
+        $exp = 1 / (1 + 10 ** (($eb - $ea) / 400));
+        $ka = 64 / (($na + 4) ** 0.3); $kb = 64 / (($nb + 4) ** 0.3);
+        $ea += $ka * ($res - $exp); $eb += $kb * ((1 - $res) - (1 - $exp));
+        $na++; $nb++;
+    }
+    return clampf(1 / (1 + 10 ** (($eb - $ea) / 400)), 0.04, 0.96);
+}
+
 /** Marcadores finales posibles partiendo de un marcador actual ($ca-$cb). */
 function ps_cond(float $s, int $bo, string $type, int $ca, int $cb): array
 {
@@ -199,7 +218,7 @@ function esports_run(array $cfg, array $sport, string $sportKey, int $now, int $
         $markets = ps_markets($d, $bo, $type, $H, $A);
         $lv = null;
         if ($live) { // en juego: se recalcula desde el marcador actual y se quita lo ya decidido
-            $markets = array_values(array_filter(ps_markets(ps_cond($s, $bo, $type, $sa, $sb), $bo, $type, $H, $A), fn($x) => $x['p'] > 0.005 && $x['p'] < 0.995));
+            $markets = array_values(array_filter(ps_markets(ps_cond(ps_live_s($s, [$ea, $eb, $n[$a] ?? 0, $n[$b] ?? 0], $sa, $sb), $bo, $type, $sa, $sb), $bo, $type, $H, $A), fn($x) => $x['p'] > 0.005 && $x['p'] < 0.995));
             $lv = ['hs' => $sa, 'as' => $sb, 'txt' => 'Mapa ' . min($bo, $sa + $sb + 1), 'state' => 'in'];
         }
         $fmt = $type === 'all_games_played' || $bo === 2 ? "$bo mapas" : "al mejor de $bo";
@@ -211,7 +230,7 @@ function esports_run(array $cfg, array $sport, string $sportKey, int $now, int $
             'exp' => [["Prob. de ganar un mapa ($H)", round($s * 100) . '%'], ['Nivel (Elo)', round($ea) . ' vs ' . round($eb)],
                       ['Mapas jugados en la base', ($n[$a] ?? 0) . ' vs ' . ($n[$b] ?? 0)]],
             'dist' => ['kind' => 'bars', 'title' => "Marcador final en mapas ($H primero)", 'data' => array_map(fn($x) => ['label' => $x['a'] . '-' . $x['b'], 'p' => round($x['p'], 4)], $d), 'mark' => null],
-            'markets' => $markets, 'mp' => round($s, 4), 'bo' => $bo, 'bt' => $type, 'lv' => $lv, 'stream' => $stream,
+            'markets' => $markets, 'mp' => round($s, 4), 'el' => [round($ea, 1), round($eb, 1), $n[$a] ?? 0, $n[$b] ?? 0], 'bo' => $bo, 'bt' => $type, 'lv' => $lv, 'stream' => $stream,
         ];
     }
     log_line("OK $sportKey: " . count($fin) . " partidos jugados en la base, $got leídos ahora, " . count($out) . ' por jugarse');
