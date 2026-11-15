@@ -180,11 +180,16 @@ function esports_run(array $cfg, array $sport, string $sportKey, int $now, int $
 
     // 3) Elo por mapa (los torneos grandes pesan un poco más)
     $elo = []; $n = []; $form = [];
+    // Cambios de nombre: el historial del ID viejo se le cuenta al ID nuevo (config: 'herencia')
+    $her = array_map('strval', $sport['herencia'] ?? []);
+    $canon = fn($id) => $her[(string)$id] ?? (string)$id;
     $fin = array_filter($db['matches'], fn($m) => $m[3] === 'FT' && $m[4] + $m[5] > 0);
     uasort($fin, fn($x, $y) => $x[0] <=> $y[0]);
     $tierW = ['s' => 1.15, 'a' => 1.05, 'b' => 1.0, 'c' => 0.9, 'd' => 0.85];
     foreach ($fin as $m) {
         [$ts, $a, $b, , $sa, $sb, , , , $tier] = $m;
+        $a = $canon($a); $b = $canon($b);
+        if ($a === $b) continue;
         $w = $tierW[strtolower((string)$tier)] ?? 1.0;
         for ($k = 0; $k < $sa + $sb; $k++) {
             $res = $k < $sa ? 1 : 0; // el orden de los mapas no importa para el nivel final
@@ -208,11 +213,12 @@ function esports_run(array $cfg, array $sport, string $sportKey, int $now, int $
         $live = $st === 'LIVE';
         if (!$live && ($st !== 'NS' || $ts < $startToday || $ts >= $endWindow || $ts < $now - 1800)) continue;
         if ($live && $ts < $now - 8 * 3600) continue;
+        $ra = $a; $rb = $b; $a = $canon($a); $b = $canon($b); // nivel e historial: los del equipo heredado
         // Sin historia suficiente de alguno de los dos, no hay base para calcular
         if (($n[$a] ?? 0) < 6 || ($n[$b] ?? 0) < 6) continue;
         $ea = $elo[$a]; $eb = $elo[$b];
         $s = clampf(1 / (1 + 10 ** (($eb - $ea) / 400)), 0.04, 0.96);
-        $H = $db['teams'][$a][0] ?? '?'; $A = $db['teams'][$b][0] ?? '?';
+        $H = $db['teams'][$ra][0] ?? '?'; $A = $db['teams'][$rb][0] ?? '?';
         $bo = max(1, $bo);
         $d = ps_scores($s, $bo, $type);
         $markets = ps_markets($d, $bo, $type, $H, $A);
@@ -224,8 +230,8 @@ function esports_run(array $cfg, array $sport, string $sportKey, int $now, int $
         $fmt = $type === 'all_games_played' || $bo === 2 ? "$bo mapas" : "al mejor de $bo";
         $out[] = [
             'id' => $mid, 'sport' => $sportKey, 'league' => $lg . ' · ' . $fmt, 'ts' => $ts,
-            'home' => $H, 'away' => $A, 'logoH' => $db['teams'][$a][1] ?? '', 'logoA' => $db['teams'][$b][1] ?? '',
-            'hid' => $a, 'aid' => $b,
+            'home' => $H, 'away' => $A, 'logoH' => $db['teams'][$ra][1] ?? '', 'logoA' => $db['teams'][$rb][1] ?? '',
+            'hid' => $ra, 'aid' => $rb,
             'formH' => array_reverse(array_slice($form[$a] ?? [], -5)), 'formA' => array_reverse(array_slice($form[$b] ?? [], -5)),
             'exp' => [["Prob. de ganar un mapa ($H)", round($s * 100) . '%'], ['Nivel (Elo)', round($ea) . ' vs ' . round($eb)],
                       ['Mapas jugados en la base', ($n[$a] ?? 0) . ' vs ' . ($n[$b] ?? 0)]],
