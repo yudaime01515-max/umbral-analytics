@@ -94,6 +94,29 @@ function odds_mejor(array $e, string $mkt, callable $pick): ?float
     return $best;
 }
 
+/**
+ * Probabilidad que le dan las casas a un resultado, ya sin su margen de ganancia:
+ * en cada casa se reparten las probabilidades implícitas (1/cuota) para que sumen 100 %, y se promedian las casas.
+ * $pick decide qué resultados cuentan como "nuestro" lado (puede ser más de uno, p. ej. doble oportunidad).
+ */
+function odds_prob(array $e, string $mkt, callable $pick, ?float $point = null): ?float
+{
+    $sum = 0.0; $n = 0;
+    foreach ($e['bookmakers'] ?? [] as $b) foreach ($b['markets'] ?? [] as $m) {
+        if (($m['key'] ?? '') !== $mkt) continue;
+        $tot = 0.0; $sel = 0.0; $k = 0;
+        foreach ($m['outcomes'] ?? [] as $o) {
+            if ($point !== null && abs(($o['point'] ?? -99) - $point) >= 0.01) continue;
+            if (empty($o['price']) || $o['price'] <= 1) continue;
+            $inv = 1 / (float)$o['price']; $tot += $inv; $k++;
+            if ($pick($o)) $sel += $inv;
+        }
+        if ($k < 2 || $sel <= 0 || $tot < 0.98 || $tot > 1.25) continue;   // mercado incompleto o raro: no se usa
+        $sum += $sel / $tot; $n++;
+    }
+    return $n ? round($sum / $n, 4) : null;
+}
+
 /** Cuota para una regla de mercado del modelo. 'est' = estimada a partir de otras cuotas reales. */
 function cuota_para(array $events, array $g, array $rule): ?array
 {
@@ -109,16 +132,17 @@ function cuota_para(array $events, array $g, array $rule): ?array
         case 'res':
             $f = $rule[1] === 'home' ? $isHome : ($rule[1] === 'away' ? $isAway : $isDraw);
             $q = odds_mejor($e, 'h2h', $f);
-            return $q ? ['q' => round($q, 2)] : null;
+            return $q ? ['q' => round($q, 2), 'pm' => odds_prob($e, 'h2h', $f)] : null;
         case 'tot':
             $over = $rule[1] === 'over'; $L = (float)$rule[2];
             $q = odds_mejor($e, 'totals', fn($o) => abs(($o['point'] ?? -99) - $L) < 0.01 && (strtolower($o['name'] ?? '') === ($over ? 'over' : 'under')));
-            return $q ? ['q' => round($q, 2)] : null;
+            return $q ? ['q' => round($q, 2), 'pm' => odds_prob($e, 'totals', fn($o) => strtolower($o['name'] ?? '') === ($over ? 'over' : 'under'), $L)] : null;
         case 'dc':
             $h = odds_mejor($e, 'h2h', $isHome); $d = odds_mejor($e, 'h2h', $isDraw); $a = odds_mejor($e, 'h2h', $isAway);
             if (!$h || !$d || !$a) return null;
             $pr = ['1X' => 1 / $h + 1 / $d, 'X2' => 1 / $a + 1 / $d, '12' => 1 / $h + 1 / $a][$rule[1]] ?? null;
-            return $pr ? ['q' => round(1 / $pr, 2), 'est' => true] : null;
+            $fd = ['1X' => fn($o) => $isHome($o) || $isDraw($o), 'X2' => fn($o) => $isAway($o) || $isDraw($o), '12' => fn($o) => $isHome($o) || $isAway($o)][$rule[1]] ?? null;
+            return $pr ? ['q' => round(1 / $pr, 2), 'est' => true, 'pm' => $fd ? odds_prob($e, 'h2h', $fd) : null] : null;
     }
     return null;
 }

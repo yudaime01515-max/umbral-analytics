@@ -76,7 +76,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             if ($pick && $tm['ts'] > $now) {
                 $entry = [
                     'id' => $tm['id'], 'sport' => $sportKey, 'league' => $tm['league'], 'ts' => $tm['ts'],
-                    'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
+                    'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
                     'status' => 'pending', 'score' => null, 'mock' => $isMock,
                 ];
                 if (!isset($histIdx[$tm['id']])) { $history[] = $entry; $histIdx[$tm['id']] = count($history) - 1; }
@@ -124,13 +124,13 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 'lgc' => $league['code'] ?? null, 'hf' => $g['home_full'] ?? '', 'af' => $g['away_full'] ?? '',
                 'formH' => recent_form($finished, $g['home_id'], $draws), 'formA' => recent_form($finished, $g['away_id'], $draws),
                 'exp' => $model['exp'], 'dist' => $model['dist'],
-                'markets' => array_values(array_column(array_map(fn($m) => array_filter(['n' => $m['n'], 'p' => $m['p'], 'pub' => $m['pub'] ?: null, 'cov' => $m['cov'] ?? null, 'q' => $m['q'] ?? null, 'qe' => $m['qe'] ?? null], fn($v) => $v !== null), $model['markets']), null, 'n')),
+                'markets' => array_values(array_column(array_map(fn($m) => array_filter(['n' => $m['n'], 'p' => $m['p'], 'pub' => $m['pub'] ?: null, 'cov' => $m['cov'] ?? null, 'q' => $m['q'] ?? null, 'pm' => $m['pm'] ?? null, 'qe' => $m['qe'] ?? null], fn($v) => $v !== null), $model['markets']), null, 'n')),
             ];
             // Guarda en el historial el pronóstico publicado, solo antes de que empiece el partido
             if ($pick && $g['ts'] > $now) {
                 $entry = [
                     'id' => $g['id'], 'sport' => $sportKey, 'league' => $g['league'], 'ts' => $g['ts'],
-                    'home' => $g['home'], 'away' => $g['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
+                    'home' => $g['home'], 'away' => $g['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
                     'status' => 'pending', 'score' => null, 'mock' => $isMock,
                 ];
                 if (!isset($histIdx[$g['id']])) { $history[] = $entry; $histIdx[$g['id']] = count($history) - 1; }
@@ -181,7 +181,7 @@ if (!empty($futCodes)) {
                     $pick = best_pick($fullMk[$m['id']] ?? [], $th, 'futbol');
                     if ($pick && $m['ts'] > $now) {
                         $entry = ['id' => $m['id'], 'sport' => 'futbol', 'league' => $m['league'], 'ts' => $m['ts'],
-                            'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'r' => $pick['r'],
+                            'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
                             'status' => 'pending', 'score' => null, 'mock' => $isMock, 'et' => $m['et'], 'lgc' => $m['lgc']];
                         if (!isset($histIdx[$m['id']])) { $history[] = $entry; $histIdx[$m['id']] = count($history) - 1; }
                         elseif ($history[$histIdx[$m['id']]]['status'] === 'pending') $history[$histIdx[$m['id']]] = $entry;

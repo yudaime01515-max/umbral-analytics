@@ -12,14 +12,18 @@
 
 const CEREBRO_LAMS = [40, 100, 300, 1000];
 const CEREBRO_ESPORTS = ['cs2', 'dota2', 'lol', 'valorant', 'r6', 'ow', 'mlbb', 'sc2'];
+const CEREBRO_W_MERCADO = 0.5; // peso inicial de las cuotas de las casas frente al modelo
 const CEREBRO_MIN = 120;      // con menos pronósticos cerrados todavía no corrige
 
 function cb_p0(array $h): float { return min(0.99, max(0.01, (float)($h['p0'] ?? $h['p']))); }
 function cb_sig(float $z): float { return 1 / (1 + exp(-$z)); }
-function cb_feats(string $sport, string $type, float $p): array
+function cb_feats(string $sport, string $type, float $p, ?float $pm = null): array
 {
     $f = ['b' => 1.0, 'z' => log($p / (1 - $p)), "s:$sport" => 1.0, "t:$type" => 1.0, "g:$sport|$type" => 1.0];
     if (in_array($sport, CEREBRO_ESPORTS, true)) $f['es'] = 1.0;
+    // 'm' = cuánto se aparta el mercado (las casas, sin su margen) de nuestro modelo. Su peso arranca en 0.5:
+    // mitad modelo, mitad mercado. Con cada pronóstico cerrado que tenga cuota, el cerebro ajusta ese peso solo.
+    if ($pm !== null && $pm > 0.01 && $pm < 0.99) $f['m'] = log($pm / (1 - $pm)) - $f['z'];
     return $f;
 }
 function cb_cerrados(array $history): array
@@ -30,10 +34,10 @@ function cb_cerrados(array $history): array
 }
 function cb_train(array $D, float $lam, int $it = 400, float $lr = 0.5): array
 {
-    $w = ['z' => 1.0]; $n = count($D);
+    $w = ['z' => 1.0, 'm' => CEREBRO_W_MERCADO]; $n = count($D);
     if (!$n) return $w;
     $X = []; $Y = [];
-    foreach ($D as $h) { $X[] = cb_feats($h['sport'], $h['r'][0], cb_p0($h)); $Y[] = $h['status'] === 'ok' ? 1.0 : 0.0; }
+    foreach ($D as $h) { $X[] = cb_feats($h['sport'], $h['r'][0], cb_p0($h), isset($h['pm']) ? (float)$h['pm'] : null); $Y[] = $h['status'] === 'ok' ? 1.0 : 0.0; }
     for ($i = 0; $i < $it; $i++) {
         $g = [];
         foreach ($X as $j => $x) {
@@ -42,16 +46,16 @@ function cb_train(array $D, float $lam, int $it = 400, float $lr = 0.5): array
             foreach ($x as $k => $v) $g[$k] = ($g[$k] ?? 0.0) + $e * $v;
         }
         foreach ($g as $k => $gk) {
-            $prior = $k === 'z' ? 1.0 : 0.0;
+            $prior = $k === 'z' ? 1.0 : ($k === 'm' ? CEREBRO_W_MERCADO : 0.0);
             $lk = $lam * ($k === 'b' || $k === 'z' ? 0.3 : 1.0);
             $w[$k] = ($w[$k] ?? 0.0) - $lr * ($gk + $lk * (($w[$k] ?? 0.0) - $prior)) / ($n + $lam);
         }
     }
     return $w;
 }
-function cb_pred(array $w, string $sport, string $type, float $p): float
+function cb_pred(array $w, string $sport, string $type, float $p, ?float $pm = null): float
 {
-    $z = 0.0; foreach (cb_feats($sport, $type, min(0.99, max(0.01, $p))) as $k => $v) $z += ($w[$k] ?? 0.0) * $v;
+    $z = 0.0; foreach (cb_feats($sport, $type, min(0.99, max(0.01, $p)), $pm) as $k => $v) $z += ($w[$k] ?? ($k === 'm' ? CEREBRO_W_MERCADO : 0.0)) * $v;
     return min(0.95, max(0.05, cb_sig($z)));
 }
 function cb_dia(array $h): int { return intdiv((int)$h['ts'] - 5 * 3600, 86400); }
@@ -73,7 +77,7 @@ function cb_examen(array $D, int $maxDias = 10): array
             $ll = fn(float $p) => -($y * log($p) + (1 - $y) * log(1 - $p));
             $S['crudo'] += $ll(min(0.95, max(0.05, cb_p0($h))));
             $ps = [];
-            foreach ($W as $l => $w) { $ps[$l] = cb_pred($w, $h['sport'], $h['r'][0], cb_p0($h)); $S[$l] += $ll($ps[$l]); }
+            foreach ($W as $l => $w) { $ps[$l] = cb_pred($w, $h['sport'], $h['r'][0], cb_p0($h), isset($h['pm']) ? (float)$h['pm'] : null); $S[$l] += $ll($ps[$l]); }
             $rows[] = [$ps, $y];
         }
     }
@@ -100,6 +104,7 @@ function cerebro_aprender(array $history, string $file, int $now): array
     if ($mejor === 'crudo') return $mem[$n] = $out;       // corregir no mejoró en el examen: se deja el modelo tal cual
     $w = cb_train($D, (float)$mejor);
     $out['activo'] = true; $out['w'] = array_map(fn($v) => round($v, 5), $w);
+    $out['mercado'] = ['peso' => round($w['m'] ?? CEREBRO_W_MERCADO, 3), 'n' => count(array_filter($D, fn($h) => isset($h['pm'])))];
     // Lecciones: cuánto mueve un pronóstico de 78% en cada deporte+mercado con historial suficiente
     $g = [];
     foreach ($D as $h) { $k = $h['sport'] . '|' . $h['r'][0]; $g[$k] = $g[$k] ?? ['n' => 0, 'ok' => 0]; $g[$k]['n']++; $g[$k]['ok'] += $h['status'] === 'ok' ? 1 : 0; }
