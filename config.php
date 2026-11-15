@@ -176,6 +176,11 @@ return [
             'enabled' => (bool)getenv('PANDASCORE_KEY'),
             'name' => 'Dota 2', 'source' => 'pandascore', 'game' => 'dota2', 'unit' => 'mapas',
             'leagues' => [],
+            // Equipos que cambiaron de nombre: PandaScore les da un ID nuevo y pierden su historial.
+            // 'ID viejo' => 'ID nuevo': el historial del viejo se le cuenta al nuevo.
+            'herencia' => [
+                '130768' => '139547', // BetBoom Team -> DO KONCA (mismo plantel, nov 2026)
+            ],
         ],
         'lol' => [
             'enabled' => (bool)getenv('PANDASCORE_KEY'),
