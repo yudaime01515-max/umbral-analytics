@@ -1031,7 +1031,7 @@ function nowWhy(c){
   }else if(c.live){var l=f.lv||{},ago=Math.max(0,Math.round((now-(DATA.live_checked||now))/60));w.push('Recalculado con el marcador en vivo ('+esc(String(l.hs))+' – '+esc(String(l.as))+(l.txt?', '+esc(l.txt):'')+'), revisado hace '+(ago<1?'menos de 1':ago)+' min.');}
   else{var mins=Math.max(1,Math.round((f.ts-now)/60));w.push('Empieza en '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min')+'.');}
   if(!c.live&&m.pm)w.push('Las casas le dan '+pct(m.pm)+'% (quitando su margen); ese dato ya está mezclado en el porcentaje.');
-  if(!c.live&&m.q&&m.p*m.q>=1.02)w.push('La mejor casa paga <b>'+m.q.toFixed(2)+'</b>: paga más de lo que debería, tiene valor.');
+  if(!c.live&&m.q&&m.p*m.q>=1.02)w.push('Las casas pagan alrededor de <b>'+m.q.toFixed(2)+'</b>: más de lo que debería, tiene valor.');
   if(c.g)w.push('Este tipo de jugada acertó <b>'+c.g.ok+' de '+c.g.n+'</b> ('+Math.round(c.g.real*100)+'%) en el historial.');
   return w.join(' ');
 }

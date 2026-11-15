@@ -81,17 +81,20 @@ function odds_evento(array $events, array $g): ?array
     return null;
 }
 
-/** Mejor cuota disponible entre todas las casas para un resultado concreto. */
+/**
+ * Cuota típica de un resultado entre todas las casas (la del medio). No se usa la más alta:
+ * una sola casa con la línea desactualizada inflaba la cuota y hacía ver "valor" donde no lo había.
+ */
 function odds_mejor(array $e, string $mkt, callable $pick): ?float
 {
-    $best = null;
+    $ps = [];
     foreach ($e['bookmakers'] ?? [] as $b) foreach ($b['markets'] ?? [] as $m) {
         if (($m['key'] ?? '') !== $mkt) continue;
-        foreach ($m['outcomes'] ?? [] as $o) {
-            if ($pick($o) && isset($o['price']) && ($best === null || $o['price'] > $best)) $best = (float)$o['price'];
-        }
+        foreach ($m['outcomes'] ?? [] as $o) if ($pick($o) && isset($o['price']) && $o['price'] > 1) $ps[] = (float)$o['price'];
     }
-    return $best;
+    if (!$ps) return null;
+    sort($ps); $n = count($ps);
+    return $n % 2 ? $ps[intdiv($n, 2)] : ($ps[$n / 2 - 1] + $ps[$n / 2]) / 2;
 }
 
 /**
