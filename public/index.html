@@ -995,6 +995,8 @@ function calGroup(sport,type){var g=CAL&&CAL.grupos&&type?CAL.grupos[sport+'|'+t
 function recFor(f,floor){
   var now=Date.now()/1000,st=liveState(f),live=st==='live';
   if(st==='done')return null;
+  // pasó la hora pero el marcador oficial dice que aún no empieza (salida demorada): sigue valiendo lo de antes del partido
+  if(live&&LIVE[f.id]&&LIVE[f.id].state==='pre')live=false;
   var es=ES_SPORTS.indexOf(f.sport)>=0,fut=live&&isLiveMk(f),esl=live&&es&&f.lv&&f.lv.state==='in'&&DATA.live_checked&&now-DATA.live_checked<900;   // marcador revisado hace menos de 15 min
   // en vivo solo vale si la probabilidad se recalculó con lo que está pasando; si no, el dato de antes ya no sirve
   if(live&&!fut&&!esl)return {stale:true};
@@ -1039,7 +1041,7 @@ function renderRec(f){
   var el=document.getElementById('dRec');if(!el)return;
   var c=recFor(f,0.5),h='<span class="ah-k">Qué jugar en este partido</span>';
   if(!c){el.hidden=true;return;}
-  if(c.stale)h+='<div class="ah-why">'+(c.late?'El partido está por terminar: ya no conviene entrar.':'Este partido está en juego y sus probabilidades no se recalculan en vivo'+(ES_SPORTS.indexOf(f.sport)>=0?' (el marcador lleva más de 15 minutos sin revisarse)':'')+'. Lo que ves abajo es de antes del partido: no lo uses para apostar ahora.')+'</div>';
+  if(c.stale)h+='<div class="ah-why">'+(c.late?'El partido está por terminar: ya no conviene entrar.':(ES_SPORTS.indexOf(f.sport)>=0?'El marcador de esta partida lleva más de 15 minutos sin revisarse.':f.sport==='basquet'||f.sport==='futbol'?'Este partido ya debería estar en juego, pero todavía no llega su marcador en vivo. En cuanto llegue (se revisa cada 30 segundos) aquí sale la jugada.':'Este deporte todavía no se recalcula en vivo.')+' Lo que ves abajo es de antes del partido: no lo uses para apostar ahora.')+'</div>';
   else if(c.weak)h+='<div class="drec-m">Espera</div><div class="ah-why">No hay jugada clara todavía. La opción más probable es <b>'+esc(c.m.n)+'</b> con '+pct(c.m.p)+'%, por debajo del mínimo de 72%. '+nowWhy(c)+'</div>';
   else{var lv=nowLvl(c.m.p);h+='<div class="drec-m">'+esc(c.m.n)+' <span class="num">'+pct(c.m.p)+'%</span></div><div class="ah-g"><span class="ah-lvl '+lv[1]+'">'+lv[0]+'</span><span>Juégala solo si tu casa paga <b class="num" style="color:var(--text)">'+fair(c.m.p)+'</b> o más</span></div><div class="ah-why">'+nowWhy(c)+'</div>';}
   el.innerHTML=h;el.hidden=false;
