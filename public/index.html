@@ -1668,6 +1668,9 @@ function liveNBA(m,j){
     var v=function(a,k){return ci[k]>=0&&a.stats?(a.stats[ci[k]]||'0'):'—';};
     var ath=(s.athletes||[]).filter(function(a){return a.stats&&a.stats.length&&!a.didNotPlay;});
     ath.sort(function(x,y){return (parseInt(v(y,'pts'),10)||0)-(parseInt(v(x,'pts'),10)||0);});
+    // ESPN a veces tarda varios minutos en publicar las estadísticas de jugadores al empezar el partido: en vez de una tabla de ceros, se avisa
+    var vacio=ath.length&&ath.every(function(a){return !(parseInt(v(a,'pts'),10)||0)&&!(parseInt(v(a,'reb'),10)||0)&&!(parseInt(v(a,'ast'),10)||0)&&!(parseInt(v(a,'min'),10)||0);});
+    if(vacio){html+='<h4 class="lv-team">'+logo((tb.team||{}).logo||'')+esc((tb.team||{}).displayName||'')+'</h4><p class="cap" style="margin:4px 0 10px">La fuente (ESPN) todavía no publica los puntos, rebotes y asistencias de los jugadores de este partido. Suele tardar unos minutos al inicio; se vuelve a pedir cada 25 segundos y aparecerán solos. Titulares: '+ath.filter(function(a){return a.starter;}).map(function(a){return esc((a.athlete||{}).shortName||'');}).join(', ')+'.</p>';return;}
     html+='<h4 class="lv-team">'+logo((tb.team||{}).logo||'')+esc((tb.team||{}).displayName||'')+'</h4><div class="tbl"><table><thead><tr><th>Jugador</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>TC</th><th>3PT</th><th>ROB</th><th>TAP</th></tr></thead><tbody>'+
       ath.map(function(a){return '<tr><td>'+esc((a.athlete||{}).shortName||(a.athlete||{}).displayName||'')+(a.starter?' <small class="lv-st">T</small>':'')+'</td><td>'+v(a,'min')+'</td><td><b>'+v(a,'pts')+'</b></td><td>'+v(a,'reb')+'</td><td>'+v(a,'ast')+'</td><td>'+v(a,'fg')+'</td><td>'+v(a,'tp')+'</td><td>'+v(a,'stl')+'</td><td>'+v(a,'blk')+'</td></tr>';}).join('')+'</tbody></table></div>';
   });
