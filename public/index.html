@@ -873,6 +873,7 @@ var ICON={
  beisbol:'<circle cx="12" cy="12" r="9"/><path d="M7 4.8c1.8 2 1.8 12.4 0 14.4M17 4.8c-1.8 2-1.8 12.4 0 14.4"/>',
  nfl:'<ellipse cx="12" cy="12" rx="10" ry="6" transform="rotate(-45 12 12)"/><path d="m9 15 6-6M10.5 10.5l3 3M8.5 12.5l3 3M12.5 8.5l3 3"/>',
  hockey:'<path d="M4 3l7 13a3 3 0 0 0 2.7 1.7H20"/><ellipse cx="16" cy="20" rx="4" ry="1.5"/>',
+ mma:'<path d="M8.3 3h7.4L21 8.3v7.4L15.7 21H8.3L3 15.7V8.3z"/><path d="M9 10.5h6M9 13.5h6"/>',
  tenis:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6c3.3 3.3 3.3 9.5 0 12.8M18.4 5.6c-3.3 3.3-3.3 9.5 0 12.8"/>',
  voley:'<circle cx="12" cy="12" r="9"/><path d="M12 3c0 5 3 8 8 9M12 12c-4 2-6 5-6 8M12 12c4 1.5 5.5 3.5 6 6.5M12 3c-3 2.5-5 5.5-8.5 6.5"/>',
  balonmano:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3.5 9h17M3.5 15h17"/>',
@@ -882,7 +883,7 @@ function icon(k,size){return '<svg width="'+(size||16)+'" height="'+(size||16)+'
 
 var DATA=null,HIST=[],SPORT_BY={},DAYS=[],TZ='America/Lima';
 var ODDS_ON=false,CAL=null,SLIP={},BRAIN=null;
-var MK_TYPE={sets_one:'gana al menos un mapa o set',res:'ganador',tot:'más/menos',dc:'doble oportunidad',hcp:'hándicap',st:'córners, tarjetas y remates',tscore:'equipo marca',btts:'ambos marcan'};
+var MK_TYPE={sets_one:'gana al menos un mapa o set',res:'ganador',tot:'más/menos',dc:'doble oportunidad',hcp:'hándicap',st:'córners, tarjetas y remates',tscore:'equipo marca',btts:'ambos marcan',dist:'llega a la decisión'};
 function renderBrain(){
   var el=document.getElementById('brainNote');if(!el)return;
   if(!BRAIN){el.hidden=true;return;}
@@ -933,7 +934,7 @@ function mkOf(m){return isLiveMk(m)?LIVE_MK[m.id].markets:m.markets;}
 function pickFor(m,th){var lv=isLiveMk(m),a=mkOf(m).filter(function(x){return x.p>=th&&(!lv||x.p<0.97);});if(!a.length)return null;a.sort(function(x,y){return x.p-y.p;});return {market:a[0],count:a.length};}
 // Duración aproximada de cada deporte: pasado ese tiempo el partido ya terminó y deja de mostrarse
 // Si ESPN ya dijo cómo va el partido, manda eso. Si no, se usa un tiempo máximo generoso por deporte.
-var DUR={futbol:2.6,basquet:3.4,tenis:4.5,cs2:4,dota2:4,lol:4,valorant:4,r6:4,ow:4,mlbb:3,sc2:3};
+var DUR={futbol:2.6,basquet:3.4,tenis:4.5,mma:6,nfl:3.8,hockey:3.2,cs2:4,dota2:4,lol:4,valorant:4,r6:4,ow:4,mlbb:3,sc2:3};
 function liveState(m){
   var now=Date.now()/1000,L=(typeof LIVE!=='undefined')&&LIVE[m.id];
   if(L){if(L.state==='post')return 'done';if(L.state==='in')return 'live';if(m.ts<=now)return 'live';}
@@ -966,8 +967,9 @@ function logo(u){return u?'<img class="logo" src="'+esc(u)+'" alt="" loading="la
 function renderPicks(){
   var th=state.th,list=dayMatches(),q=state.q.trim().toLowerCase();
   var counts={all:0};DATA.sports.forEach(function(s){counts[s.id]=0;});
-  var aboveMk=0,matchesWith=0,total=0,rows=[];
+  var aboveMk=0,matchesWith=0,total=0,rows=[],have={};
   list.forEach(function(f){
+    have[f.sport]=1;
     var pk=pickFor(f,th);
     if(state.sport==='all'||f.sport===state.sport){total++;mkOf(f).forEach(function(m){if(m.p>=th)aboveMk++;});if(pk)matchesWith++;}
     // "Todos los partidos": también los que no llegan al umbral, mostrando su mercado más probable
@@ -991,7 +993,7 @@ function renderPicks(){
   (function(){var el=document.getElementById('comboNote');if(!el)return;var g=CAL&&CAL.global,r=g&&g.n>=20?g.real:null,p=r!==null?r:Math.max(th,0.7),f=function(n){return Math.round(Math.pow(p,n)*100);};
     el.innerHTML='<b class="tag">OJO</b><div><strong>Cada pronóstico se juega solo.</strong> '+(r!==null?'Hasta hoy Umbral acertó <strong>'+Math.round(r*100)+'%</strong> de '+g.n+' pronósticos cerrados (el modelo ya se corrige con eso). ':'')+'Si juntas varios en una combinada, la probabilidad se multiplica y cae rápido: con '+Math.round(p*100)+'% cada uno, <strong>2 juntos aciertan '+f(2)+'%, 3 juntos '+f(3)+'%, 5 juntos '+f(5)+'%</strong>. Ninguna probabilidad es una fija.'+(ODDS_ON?'':' Las cuotas de casas aún no están conectadas: confirma que tu casa ofrezca el mercado antes de apostar.')+'</div>';})();
   document.getElementById('boardSub').textContent=state.all?(rows.length+(rows.length===1?' partido':' partidos')+' · '+matchesWith+' superan '+pct(th)+'%'):(rows.length+(rows.length===1?' partido':' partidos')+' con al menos un mercado sobre '+pct(th)+'%');
-  renderSports(counts);renderCombos(list);renderNow();renderBrain();
+  renderSports(counts,have);renderCombos(list);renderNow();renderBrain();
   if(!list.length){elPicks.innerHTML='<div class="empty"><strong>No hay partidos programados para este día</strong>Prueba con otro día o revisa más tarde.</div>';return;}
   if(!rows.length){elPicks.innerHTML='<div class="empty"><strong>Ningún partido supera '+pct(th)+'% con estos filtros</strong>Baja el umbral en la regla, cambia de deporte o de día.</div>';return;}
   elPicks.innerHTML=rows.map(function(r){var f=r.f,m=r.pk.market,sp=SPORT_BY[f.sport]||{name:f.sport};
@@ -1167,9 +1169,9 @@ document.getElementById('combos').addEventListener('click',function(e){
     try{navigator.clipboard.writeText(txt).then(ok,function(){window.prompt('Copia la combinada:',txt);});}catch(err){window.prompt('Copia la combinada:',txt);}
     return;}
   var b=e.target.closest('.cb-leg');if(b)openDetail(b.dataset.id);});
-function renderSports(counts){
+function renderSports(counts,have){have=have||{};
   var items=[{id:'all',name:'Todos'}].concat(DATA.sports);
-  document.getElementById('sports').innerHTML=items.filter(function(s){return s.id==='all'||state.sport===s.id||(counts[s.id]||0)>0;}).map(function(s){return '<button class="chip" data-sport="'+s.id+'" aria-pressed="'+(state.sport===s.id)+'">'+(s.id==='all'?'':icon(s.id,16))+esc(s.name)+' <span class="count num">'+(counts[s.id]||0)+'</span></button>';}).join('');
+  document.getElementById('sports').innerHTML=items.filter(function(s){return s.id==='all'||state.sport===s.id||have[s.id];}).map(function(s){return '<button class="chip" data-sport="'+s.id+'" aria-pressed="'+(state.sport===s.id)+'">'+(s.id==='all'?'':icon(s.id,16))+esc(s.name)+' <span class="count num">'+(counts[s.id]||0)+'</span></button>';}).join('');
 }
 function renderDays(){
   document.getElementById('days').innerHTML=DAYS.map(function(k,i){return '<button data-day="'+i+'" aria-pressed="'+(state.day===i)+'">'+dayLabel(k)+'</button>';}).join('');
@@ -1344,8 +1346,9 @@ var METHOD={
  futbol:['Fútbol','Modelo de Poisson con ataque y defensa de cada equipo y ventaja de local. Da la probabilidad de cada marcador y de ahí 1X2, doble oportunidad, totales y ambos marcan. Córners, tarjetas, remates y faltas salen de los promedios de los últimos 10 partidos de cada equipo (a favor y en contra).'],
  basquet:['Básquet','Puntos esperados de cada equipo y distribución normal sobre la diferencia. Ganador, hándicaps y totales.'],
  beisbol:['Béisbol','Poisson de carreras con la fuerza ofensiva y defensiva de cada equipo. Ganador con extra innings, +1.5 y totales.'],
- nfl:['Fútbol americano','Puntos esperados y distribución normal con la variación típica de la liga: ganador, hándicap y total.'],
- hockey:['Hockey','Poisson de goles con prórroga repartida según la fuerza de cada equipo. Ganador, +1.5 y totales.'],
+ nfl:['NFL','Puntos que anota y recibe cada equipo esta temporada, con ventaja de local, y la variación típica de la liga. Ganador (con prórroga), hándicap y total. Datos de ESPN.'],
+ mma:['UFC / MMA','Nivel de cada peleador con un sistema Elo armado con todas las peleas de UFC desde 2022: sube o baja con cada pelea, más si le gana a alguien mejor. Dos mercados: quién gana y si la pelea llega a la decisión de los jueces (según la categoría y la costumbre de cada peleador). Probado con 2 788 peleas: el favorito del modelo ganó 59 %, y cuando marcó 65 a 70 % ganó 67 %. En este deporte casi nunca hay favoritos de 75 % o más. El récord se muestra, pero no entra al cálculo.'],
+ hockey:['Hockey NHL','Poisson de goles con prórroga repartida según la fuerza de cada equipo. Ganador (con prórroga y penales), +1.5 y totales. Datos de ESPN.'],
  tenis:['Tenis','Nivel de cada jugador con un sistema Elo: parte de su ranking ATP o WTA y sube o baja con cada partido que gana o pierde, más si le gana a alguien mejor. De ahí sale la probabilidad de ganar el partido y cada set. Ganador, al menos un set, sets totales y ganar 2-0.'],
  voley:['Vóley','Probabilidad de ganar cada set según sets ganados y cedidos, al mejor de cinco. Ganador, sets totales y hándicap.'],
  balonmano:['Balonmano','Goles esperados y distribución normal sobre la diferencia. Ganador, hándicap y total.'],

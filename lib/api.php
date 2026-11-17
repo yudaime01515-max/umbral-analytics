@@ -12,7 +12,7 @@ const VOID_STATUS = ['PST', 'CANC', 'ABD', 'AWD', 'WO', 'POST', 'INTR', 'SUSP', 
 function api_get(array $cfg, string $sportKey, array $sport, array $league): array
 {
     $root = dirname(__DIR__);
-    if (($league['src'] ?? '') === 'espn') return espn_league_games($cfg, $league);
+    if (($league['src'] ?? '') === 'espn') return espn_league_games($cfg, $league, $sportKey);
     if (($sport['source'] ?? '') === 'espn') return espn_nba_events($cfg, $league);
     if (($sport['source'] ?? '') === 'balldontlie') return bdl_get($cfg, $sportKey, $league);
     $fd = ($sport['source'] ?? 'apisports') === 'footballdata';

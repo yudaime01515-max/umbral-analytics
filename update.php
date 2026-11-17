@@ -13,6 +13,7 @@ require "$root/lib/espn_futbol.php";
 require "$root/lib/tenis.php";
 require "$root/lib/espn_ligas.php";
 require "$root/lib/esports.php";
+require "$root/lib/mma.php";
 require "$root/lib/aprendizaje.php";
 require "$root/lib/cuotas.php";
 require "$root/lib/cerebro.php";
@@ -64,13 +65,20 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
     $any = false;
     // Tenis: va por su propio camino (jugadores en vez de equipos)
     // Esports (PandaScore) va por el mismo camino que el tenis
-    if (in_array($sport['source'] ?? '', ['espn_tenis', 'pandascore'], true)) {
+    if (in_array($sport['source'] ?? '', ['espn_tenis', 'pandascore', 'espn_mma'], true)) {
         try { $tn = ($sport['source'] === 'pandascore') ? esports_run($cfg, $sport, $sportKey, $now, $startToday, $endWindow, $dataDir)
-                                                       : tenis_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir); }
+                  : (($sport['source'] === 'espn_mma') ? mma_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir)
+                                                       : tenis_run($cfg, $sport, $now, $startToday, $endWindow, $dataDir)); }
         catch (Throwable $e) { log_line("ERROR $sportKey: " . $e->getMessage()); continue; }
         foreach ($tn['final'] as $fid => $fv) $finalScores[$fid] = $fv;
+        // Cuotas reales (solo deportes con 'odds_code', hoy UFC) y solo si hay pelea en las próximas 48 h
+        $tnOdds = null;
+        if (!empty($sport['odds_code'])) {
+            $tnSoon = (bool)array_filter($tn['matches'], fn($x) => $x['ts'] > $now && $x['ts'] < $now + 48 * 3600);
+            $tnOdds = odds_liga($cfg, (string)$sport['odds_code'], $tnSoon);
+        }
         foreach ($tn['matches'] as $tm) {
-            $tm['markets'] = calibrar_markets($tm['markets'], $sportKey, $CAL);
+            $tm['markets'] = calibrar_markets($tm['markets'], $sportKey, $CAL, $tnOdds, $tnOdds !== null ? $tm : null);
             $matches[] = $tm;
             $pick = best_pick($tm['markets'], $th, $sportKey);
             if ($pick && $tm['ts'] > $now) {
@@ -104,6 +112,9 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             elseif (in_array($g['status'], VOID_STATUS, true)) $finalScores[$g['id']] = ['status' => 'void'];
         }
         $R = team_ratings($finished, $now);
+        // Cuotas reales: solo se gasta una consulta si la liga juega en las próximas 48 h
+        $oddsSoon = (bool)array_filter($games, fn($x) => in_array($x['status'], NOT_STARTED, true) && $x['ts'] > $now && $x['ts'] < $now + 48 * 3600);
+        $oddsEv = odds_liga($cfg, (string)($league['code'] ?? ''), $oddsSoon);
 
         foreach ($games as $g) {
             // Por jugarse o en juego (en juego se sigue mostrando con su pronóstico previo; la web lo recalcula en vivo)
@@ -112,7 +123,6 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             if ($g['ts'] < $startToday - 6 * 3600 || $g['ts'] >= $endWindow) continue;
             $model = model_match($sport, $R, $g);
             if (!$model) continue;
-            $oddsEv = odds_liga($cfg, (string)($league['code'] ?? ''));
             $model['markets'] = calibrar_markets($model['markets'], $sportKey, $CAL, $oddsEv, $g);
             $pick = best_pick($model['markets'], $th, $sportKey);
             $fullMk[$g['id']] = $model['markets'];
@@ -211,8 +221,15 @@ foreach ($history as &$h) {
     if (!isset($finalScores[$h['id']])) continue;
     $f = $finalScores[$h['id']];
     if ($f['status'] === 'void') { $h['status'] = 'void'; continue; }
+    // UFC: "llega a la decisión" se cierra con cómo terminó la pelea, no con el marcador
+    if (($h['r'][0] ?? '') === 'dist') {
+        if (!isset($f['dist'])) continue;
+        $h['status'] = ($f['dist'] === (($h['r'][1] ?? '') === 'yes')) ? 'ok' : 'ko';
+        $h['score'] = $f['txt'] ?? ($f['dist'] ? 'Decisión' : 'Antes del límite');
+        continue;
+    }
     $h['status'] = settle($h['r'], $f['hs'], $f['as']) ? 'ok' : 'ko';
-    $h['score'] = $f['hs'] . '-' . $f['as'];
+    $h['score'] = $f['txt'] ?? ($f['hs'] . '-' . $f['as']);
 }
 unset($h);
 // Conserva 180 días
@@ -224,7 +241,7 @@ usort($history, fn($a, $b) => $b['ts'] <=> $a['ts']);
 $prevPath = "$dataDir/pronosticos.json";
 if (empty($cfg['mock']) && is_file($prevPath)) {
     $prev = json_decode(file_get_contents($prevPath), true) ?: [];
-    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5]; // esports: se recalculan solos en cada actualización
+    $dur = ['futbol' => 2.6, 'basquet' => 3.4, 'tenis' => 4.5, 'mma' => 6, 'nfl' => 3.8, 'hockey' => 3.2]; // esports: se recalculan solos en cada actualización
     $have = array_flip(array_column($matches, 'id'));
     foreach ($prev['matches'] ?? [] as $pm) {
         if (!isset($pm['id'], $pm['ts']) || isset($have[$pm['id']])) continue;

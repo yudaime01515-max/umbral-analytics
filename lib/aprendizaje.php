@@ -64,7 +64,7 @@ function calibrar_markets(array $markets, string $sport, array $cal, ?array $odd
         $m['p0'] = $m['p'];
         // Cuota real y probabilidad del mercado (las casas, sin su margen), si la liga tiene cobertura
         $pm = null;
-        if ($odds !== null) $m['cov'] = true;   // liga con cobertura de cuotas: ahí sí se exige que la casa lo ofrezca
+        if ($odds !== null && $type !== 'dist') $m['cov'] = true;   // (dist: las casas no lo dan en este servicio) liga con cobertura de cuotas: ahí sí se exige que la casa lo ofrezca
         if ($odds && $game && function_exists('cuota_para')) {
             $q = cuota_para($odds, $game, $m['r']);
             if ($q) { $m['q'] = $q['q']; if (!empty($q['est'])) $m['qe'] = true; if (!empty($q['pm'])) { $pm = (float)$q['pm']; $m['pm'] = $pm; } }

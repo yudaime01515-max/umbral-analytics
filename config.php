@@ -40,6 +40,7 @@ return [
     'publicables' => [
         'default' => ['res', 'dc', 'tot', 'btts', 'hcp', 'sets_one'],   // sets_one = gana al menos un mapa (esports): 79% de acierto en CS2
         'tenis'   => ['res', 'tot'],
+        'mma'     => ['res', 'dist'],   // dist = la pelea llega (o no) a la decisión de los jueces
     ],
 
     // Cuotas reales (opcional): con el secreto ODDS_API_KEY solo se publica lo que una casa ofrece de verdad.
@@ -48,6 +49,11 @@ return [
     'valor_min'       => 1.0,
     'odds_ttl_hours'  => 24,   // cada liga se consulta una vez al día (el plan gratis da 500 créditos al mes)
     'odds_regions'    => 'eu',
+    // Presupuesto de cuotas: el plan gratis da 500 créditos al mes (~16 al día). Cada liga gasta 2 por consulta.
+    // Solo se consulta una liga si tiene partido en las próximas 48 h y su última consulta ya venció.
+    'odds_creditos_dia' => 14,
+    // Ligas que nunca se quedan sin cuota: las demás dejan libres 6 créditos diarios para estas
+    'odds_prioridad'  => ['NBA', 'PL', 'PD', 'CL', 'LIB', 'PER', 'NFL', 'UFC'],
 
     // Días hacia adelante que se muestran (0 = solo hoy)
     'days_ahead'   => 5,
@@ -221,19 +227,33 @@ return [
             ],
         ],
         'nfl' => [
-            'enabled' => !$fdKey || $apiSportsPaid,
-            'name' => 'Fútbol americano', 'host' => 'https://v1.american-football.api-sports.io', 'endpoint' => 'games',
-            'model' => 'normal', 'sd' => 13.5, 'tsd' => 10, 'alt' => 7, 'talt' => 9, 'home' => 2,
-            'leagues' => [
+            // NFL: con datos reales sale de ESPN (gratis, sin clave)
+            'enabled' => true,
+            'name' => 'NFL', 'host' => 'https://v1.american-football.api-sports.io', 'endpoint' => 'games',
+            'model' => 'normal', 'sd' => 13.5, 'tsd' => 13.5, 'alt' => 7, 'talt' => 9, 'home' => 2,
+            'leagues' => ($fdKey && !$apiSportsPaid) ? [
+                ['code' => 'NFL', 'path' => 'football/nfl', 'src' => 'espn', 'name' => 'NFL', 'on' => true],
+            ] : [
                 ['id' => 1, 'season' => 2026, 'name' => 'NFL', 'on' => true],
             ],
         ],
         'hockey' => [
-            'enabled' => !$fdKey || $apiSportsPaid,
-            'name' => 'Hockey', 'host' => 'https://v1.hockey.api-sports.io', 'endpoint' => 'games',
+            // NHL: con datos reales sale de ESPN (gratis, sin clave). El marcador final incluye prórroga y penales.
+            'enabled' => true,
+            'name' => 'Hockey NHL', 'host' => 'https://v1.hockey.api-sports.io', 'endpoint' => 'games',
             'model' => 'poisson_ot', 'unit' => 'goles', 'alt' => 1,
-            'leagues' => [
+            'leagues' => ($fdKey && !$apiSportsPaid) ? [
+                ['code' => 'NHL', 'path' => 'hockey/nhl', 'src' => 'espn', 'name' => 'NHL', 'on' => true],
+            ] : [
                 ['id' => 57, 'season' => 2026, 'name' => 'NHL', 'on' => true],
+            ],
+        ],
+        'mma' => [
+            // UFC desde ESPN (gratis, sin clave). Peleadores en vez de equipos: va por su propio camino (lib/mma.php).
+            'enabled' => (bool)($envKey || $fdKey || $bdlKey),
+            'name' => 'UFC / MMA', 'source' => 'espn_mma', 'odds_code' => 'UFC',
+            'leagues' => [
+                ['code' => 'ufc', 'name' => 'UFC', 'on' => true],
             ],
         ],
         'voley' => [

@@ -4,7 +4,10 @@
  * Sirve para dos cosas: saber si una casa de verdad ofrece el mercado, y mostrar su cuota.
  *
  * El plan gratis da 500 créditos al mes. Cada consulta (h2h + totals, 1 región) gasta 2 créditos,
- * así que cada liga se consulta como máximo una vez cada 'odds_ttl_hours' horas (por defecto 24).
+ * así que cada liga se consulta como máximo una vez cada 'odds_ttl_hours' horas (por defecto 24),
+ * solo si juega en las próximas 48 h y sin pasar de 'odds_creditos_dia' créditos diarios.
+ * Las cuotas se guardan en public/data/cuotas/ para que el límite se respete entre una actualización y otra
+ * (antes se guardaban en una carpeta temporal que se borraba cada hora: el cupo del mes se iba en un día).
  */
 
 const ODDS_KEYS = [
@@ -14,39 +17,98 @@ const ODDS_KEYS = [
     'BRA' => 'soccer_brazil_campeonato', 'MEX' => 'soccer_mexico_ligamx', 'MLS' => 'soccer_usa_mls',
     'UEL' => 'soccer_uefa_europa_league', 'UECL' => 'soccer_uefa_europa_conference_league',
     'LIB' => 'soccer_conmebol_copa_libertadores', 'SUD' => 'soccer_conmebol_copa_sudamericana',
-    'NBA' => 'basketball_nba',
+    'NBA' => 'basketball_nba', 'NFL' => 'americanfootball_nfl', 'NHL' => 'icehockey_nhl', 'UFC' => 'mma_mixed_martial_arts',
 ];
+const ODDS_SOLO_GANADOR = ['UFC'];   // ligas donde solo se pide el ganador (1 crédito en vez de 2)
 
 function odds_activo(): bool { return (string)(getenv('ODDS_API_KEY') ?: '') !== ''; }
 
-/** Eventos con cuotas de una liga, o null si no hay clave, no hay cobertura o se agotó el presupuesto. */
-function odds_liga(array $cfg, string $code): ?array
+/** Carpeta donde se guardan las cuotas. Va dentro de los datos para que se conserve entre una actualización y otra. */
+function odds_dir(): string
+{
+    $dir = (defined('UMBRAL_DATA') ? UMBRAL_DATA : sys_get_temp_dir()) . '/cuotas';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    return $dir;
+}
+
+/** Contador de créditos del día (UTC) y pausa si la cuenta se quedó sin cupo. */
+function odds_estado(?array $set = null): array
+{
+    static $st = null;
+    $file = odds_dir() . '/_estado.json';
+    if ($st === null) $st = is_file($file) ? (json_decode((string)file_get_contents($file), true) ?: []) : [];
+    $hoy = gmdate('Y-m-d');
+    if (($st['dia'] ?? '') !== $hoy) { $st['dia'] = $hoy; $st['usados'] = 0; }
+    if ($set !== null) { $st = array_merge($st, $set); file_put_contents($file, json_encode($st)); }
+    return $st;
+}
+
+/** Guarda solo lo que se usa de cada evento (equipos, hora y precios): el archivo queda pequeño. */
+function odds_compacto(array $data): array
+{
+    $out = [];
+    foreach ($data as $e) {
+        $bs = [];
+        foreach ($e['bookmakers'] ?? [] as $b) {
+            $ms = [];
+            foreach ($b['markets'] ?? [] as $m) {
+                $os = [];
+                foreach ($m['outcomes'] ?? [] as $o) $os[] = array_filter(['name' => $o['name'] ?? '', 'price' => $o['price'] ?? null, 'point' => $o['point'] ?? null], fn($v) => $v !== null);
+                $ms[] = ['key' => $m['key'] ?? '', 'outcomes' => $os];
+            }
+            if ($ms) $bs[] = ['markets' => $ms];
+        }
+        $out[] = ['commence_time' => $e['commence_time'] ?? '', 'home_team' => $e['home_team'] ?? '', 'away_team' => $e['away_team'] ?? '', 'bookmakers' => $bs];
+    }
+    return $out;
+}
+
+/**
+ * Eventos con cuotas de una liga, o null si no hay clave, no hay cobertura o no hay cuotas vigentes.
+ * $soon = la liga juega en las próximas 48 h. Solo entonces se gasta una consulta, y solo si la copia
+ * guardada ya venció y queda presupuesto del día. Si no, se usa la copia guardada (hasta 48 h de antigüedad).
+ */
+function odds_liga(array $cfg, string $code, bool $soon = true): ?array
 {
     static $mem = [];
     if (!odds_activo() || !isset(ODDS_KEYS[$code])) return null;
     if (array_key_exists($code, $mem)) return $mem[$code];
     $key = ODDS_KEYS[$code];
-    $dir = defined('UMBRAL_CACHE') ? UMBRAL_CACHE : sys_get_temp_dir();
-    if (!is_dir($dir)) mkdir($dir, 0775, true);
-    $file = "$dir/odds_$key.json";
+    $file = odds_dir() . "/$key.json";
     $ttl = (float)($cfg['odds_ttl_hours'] ?? 24) * 3600;
-    if (is_file($file) && time() - filemtime($file) < $ttl) {
-        return $mem[$code] = json_decode(file_get_contents($file), true) ?: [];
-    }
+    $age = is_file($file) ? time() - filemtime($file) : null;
+    $saved = fn() => ($age !== null && $age < 48 * 3600) ? (json_decode((string)file_get_contents($file), true) ?: []) : null;
+    if ($age !== null && $age < $ttl) return $mem[$code] = $saved();
+    if (!$soon) return $mem[$code] = $saved();
+
+    $markets = in_array($code, ODDS_SOLO_GANADOR, true) ? 'h2h' : 'h2h,totals';
+    $cost = substr_count($markets, ',') + 1;
+    $st = odds_estado();
+    $cap = (int)($cfg['odds_creditos_dia'] ?? 14);
+    if (!in_array($code, $cfg['odds_prioridad'] ?? [], true)) $cap -= 6;   // deja créditos para las ligas prioritarias
+    if (($st['pausa'] ?? 0) > time()) return $mem[$code] = $saved();
+    if (($st['usados'] ?? 0) + $cost > $cap) { log_line("cuotas $key: presupuesto del día agotado, se usa la copia guardada"); return $mem[$code] = $saved(); }
+
     $url = 'https://api.the-odds-api.com/v4/sports/' . $key . '/odds/?' . http_build_query([
-        'apiKey' => getenv('ODDS_API_KEY'), 'regions' => $cfg['odds_regions'] ?? 'eu', 'markets' => 'h2h,totals',
+        'apiKey' => getenv('ODDS_API_KEY'), 'regions' => $cfg['odds_regions'] ?? 'eu', 'markets' => $markets,
         'oddsFormat' => 'decimal', 'dateFormat' => 'iso',
     ]);
     $ctx = stream_context_create(['http' => ['timeout' => 20, 'ignore_errors' => true]]);
     $raw = @file_get_contents($url, false, $ctx);
+    $left = null;
+    foreach ($http_response_header ?? [] as $hd) if (stripos($hd, 'x-requests-remaining:') === 0) $left = (int)trim(substr($hd, 21));
     $data = $raw ? json_decode($raw, true) : null;
     if (!is_array($data) || isset($data['message'])) {
-        log_line("ERROR cuotas $key: " . ($data['message'] ?? 'sin respuesta'));
-        // si hay una copia vieja, se usa antes que nada
-        return $mem[$code] = (is_file($file) ? (json_decode(file_get_contents($file), true) ?: []) : null);
+        $msg = (string)($data['message'] ?? 'sin respuesta');
+        // Sin cupo en la cuenta: no se vuelve a intentar hasta dentro de 12 horas (cada intento fallido es tiempo perdido)
+        if (stripos($msg, 'quota') !== false) { odds_estado(['pausa' => time() + 12 * 3600]); log_line("ERROR cuotas: la cuenta de The Odds API se quedó sin créditos este mes. Se reintenta en 12 h."); }
+        else log_line("ERROR cuotas $key: $msg");
+        return $mem[$code] = $saved();
     }
-    file_put_contents($file, json_encode($data));
-    log_line("OK cuotas $key: " . count($data) . ' eventos');
+    $data = odds_compacto($data);
+    file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE));
+    odds_estado(array_filter(['usados' => ($st['usados'] ?? 0) + $cost, 'restantes' => $left, 'pausa' => 0], fn($v) => $v !== null));
+    log_line("OK cuotas $key: " . count($data) . ' eventos' . ($left !== null ? " (quedan $left créditos este mes)" : ''));
     return $mem[$code] = $data;
 }
 
@@ -73,10 +135,10 @@ function odds_evento(array $events, array $g): ?array
         if (!$t || abs($t - $g['ts']) > 36 * 3600) continue;
         $h = [$g['home'], $g['home_full'] ?? ''];
         $a = [$g['away'], $g['away_full'] ?? ''];
-        $okH = false; $okA = false;
-        foreach ($h as $x) if ($x !== '' && odds_igual($x, $e['home_team'] ?? '')) $okH = true;
-        foreach ($a as $x) if ($x !== '' && odds_igual($x, $e['away_team'] ?? '')) $okA = true;
-        if ($okH && $okA) return $e;
+        $hit = function (array $names, string $team): bool { foreach ($names as $x) if ($x !== '' && odds_igual($x, $team)) return true; return false; };
+        if ($hit($h, $e['home_team'] ?? '') && $hit($a, $e['away_team'] ?? '')) return $e;
+        // En peleas (UFC) no hay local ni visitante: la casa puede listar a los peleadores al revés
+        if ($hit($h, $e['away_team'] ?? '') && $hit($a, $e['home_team'] ?? '')) { [$e['home_team'], $e['away_team']] = [$e['away_team'], $e['home_team']]; return $e; }
     }
     return null;
 }
