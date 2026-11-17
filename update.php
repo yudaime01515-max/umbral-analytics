@@ -18,6 +18,14 @@ require "$root/lib/aprendizaje.php";
 require "$root/lib/cuotas.php";
 require "$root/lib/cerebro.php";
 
+/** Racha reciente de cada lado [victorias local, partidos, victorias visita, partidos]: se guarda con cada pronóstico
+ *  para que el cerebro pueda probar más adelante si la racha ayuda a acertar (hoy solo se registra, no se usa). */
+function fx_de(array $m): array
+{
+    $w = fn($f) => count(array_filter((array)$f, fn($x) => $x === 'w'));
+    return [$w($m['formH'] ?? []), count((array)($m['formH'] ?? [])), $w($m['formA'] ?? []), count((array)($m['formA'] ?? []))];
+}
+
 // Si se abre desde el navegador, exige la clave
 if (PHP_SAPI !== 'cli' && ($_GET['token'] ?? '') !== $cfg['cron_token']) {
     http_response_code(403);
@@ -85,7 +93,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 $entry = [
                     'id' => $tm['id'], 'sport' => $sportKey, 'league' => $tm['league'], 'ts' => $tm['ts'],
                     'home' => $tm['home'], 'away' => $tm['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
-                    'status' => 'pending', 'score' => null, 'mock' => $isMock,
+                    'status' => 'pending', 'score' => null, 'mock' => $isMock, 'fx' => fx_de($tm),
                 ];
                 if (!isset($histIdx[$tm['id']])) { $history[] = $entry; $histIdx[$tm['id']] = count($history) - 1; }
                 elseif ($history[$histIdx[$tm['id']]]['status'] === 'pending') { $history[$histIdx[$tm['id']]] = $entry; }
@@ -141,7 +149,7 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
                 $entry = [
                     'id' => $g['id'], 'sport' => $sportKey, 'league' => $g['league'], 'ts' => $g['ts'],
                     'home' => $g['home'], 'away' => $g['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
-                    'status' => 'pending', 'score' => null, 'mock' => $isMock,
+                    'status' => 'pending', 'score' => null, 'mock' => $isMock, 'fx' => fx_de($matches[count($matches) - 1]),
                 ];
                 if (!isset($histIdx[$g['id']])) { $history[] = $entry; $histIdx[$g['id']] = count($history) - 1; }
                 elseif ($history[$histIdx[$g['id']]]['status'] === 'pending') { $history[$histIdx[$g['id']]] = $entry; }
@@ -192,7 +200,7 @@ if (!empty($futCodes)) {
                     if ($pick && $m['ts'] > $now) {
                         $entry = ['id' => $m['id'], 'sport' => 'futbol', 'league' => $m['league'], 'ts' => $m['ts'],
                             'home' => $m['home'], 'away' => $m['away'], 'n' => $pick['n'], 'p' => $pick['p'], 'p0' => $pick['p0'] ?? $pick['p'], 'q' => $pick['q'] ?? null, 'pm' => $pick['pm'] ?? null, 'r' => $pick['r'],
-                            'status' => 'pending', 'score' => null, 'mock' => $isMock, 'et' => $m['et'], 'lgc' => $m['lgc']];
+                            'status' => 'pending', 'score' => null, 'mock' => $isMock, 'et' => $m['et'], 'lgc' => $m['lgc'], 'fx' => fx_de($m)];
                         if (!isset($histIdx[$m['id']])) { $history[] = $entry; $histIdx[$m['id']] = count($history) - 1; }
                         elseif ($history[$histIdx[$m['id']]]['status'] === 'pending') $history[$histIdx[$m['id']]] = $entry;
                     }
