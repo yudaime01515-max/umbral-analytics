@@ -165,6 +165,9 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
     $path = "$dataDir/nba.json";
     $db = is_file($path) ? (json_decode(file_get_contents($path), true) ?: []) : [];
     if (($db['season'] ?? null) !== $season) $db = ['season' => $season, 'teams' => [], 'players' => [], 'done' => []];
+    // v2: las filas guardan también tiros libres (anotados e intentados). Al subir de versión se
+    // vuelven a leer las planillas de la temporada y se reemplazan las filas viejas (sin perder nada).
+    if (($db['v'] ?? 1) < 2) { $db['done'] = []; $db['v'] = 2; }
     $done = array_flip(array_map('strval', $db['done'] ?? []));
 
     // Equipos (nombre, sigla y escudo) desde el calendario
@@ -208,11 +211,13 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
             $c3 = espn_col($keys, $labels, ['threePointFieldGoalsMade-threePointFieldGoalsAttempted', '3PT']);
             $cStl = espn_col($keys, $labels, ['steals', 'STL']);
             $cBlk = espn_col($keys, $labels, ['blocks', 'BLK']);
+            $cFt = espn_col($keys, $labels, ['freeThrowsMade-freeThrowsAttempted', 'FT']);
             if ($cPts === null) continue;
             foreach ($st['athletes'] ?? [] as $a) {
                 $s = $a['stats'] ?? [];
                 if (!empty($a['didNotPlay']) || !$s) continue;
                 $num = fn($i) => ($i === null || !isset($s[$i])) ? 0 : (int)explode('-', (string)$s[$i])[0];
+                $num2 = fn($i) => ($i === null || !isset($s[$i])) ? 0 : (int)(explode('-', (string)$s[$i])[1] ?? 0);
                 $min = $num($cMin);
                 if ($min <= 0 && $num($cPts) === 0) continue;
                 $ath = $a['athlete'] ?? [];
@@ -223,8 +228,10 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
                 $p['ph'] = $ath['headshot']['href'] ?? ($p['ph'] ?? '');
                 $p['pos'] = $ath['position']['abbreviation'] ?? ($p['pos'] ?? '');
                 $p['t'] = $tid; // equipo actual (cambia si lo traspasan)
-                // [fecha, rival, local, min, pts, reb, ast, triples, robos, tapas]
-                $p['h'][] = [$g['ts'], $opp, $isHome ? 1 : 0, $min, $num($cPts), $num($cReb), $num($cAst), $num($c3), $num($cStl), $num($cBlk)];
+                // [fecha, rival, local, min, pts, reb, ast, triples, robos, tapas, TL anotados, TL intentados]
+                $row = [$g['ts'], $opp, $isHome ? 1 : 0, $min, $num($cPts), $num($cReb), $num($cAst), $num($c3), $num($cStl), $num($cBlk), $num($cFt), $num2($cFt)];
+                $p['h'] = array_values(array_filter($p['h'], fn($r) => !($r[0] === $row[0] && $r[1] === $row[1]))); // sin duplicar al releer
+                $p['h'][] = $row;
                 $db['players'][$pid] = $p;
             }
         }
@@ -250,7 +257,7 @@ function nba_props(array $m, array $db): array
 {
     $players = $db['players'] ?? []; $out = [];
     $stats = [['puntos', fn($g) => $g[4]], ['rebotes', fn($g) => $g[5]], ['asistencias', fn($g) => $g[6]],
-              ['triples', fn($g) => $g[7]], ['PTS+REB+AST', fn($g) => $g[4] + $g[5] + $g[6]]];
+              ['triples', fn($g) => $g[7]], ['tiros libres', fn($g) => $g[10] ?? null], ['PTS+REB+AST', fn($g) => $g[4] + $g[5] + $g[6]]];
     foreach ([(string)($m['hid'] ?? ''), (string)($m['aid'] ?? '')] as $tid) {
         if ($tid === '') continue;
         $cand = [];
@@ -266,7 +273,9 @@ function nba_props(array $m, array $db): array
         usort($cand, fn($a, $b) => $b[3] <=> $a[3]);
         foreach (array_slice($cand, 0, 5) as [$pid, $name, $h]) {
             foreach ($stats as [$sn, $f]) {
-                $v = array_map($f, $h); $n = count($v); $mu = array_sum($v) / $n;
+                $v = array_values(array_filter(array_map($f, $h), fn($x) => $x !== null)); $n = count($v);
+                if ($n < 4) continue; // filas viejas sin el dato (tiros libres) mientras se relee la temporada
+                $mu = array_sum($v) / $n;
                 if ($mu < 1.2) continue; // estadísticas casi en cero no tienen línea útil
                 $var = 0; foreach ($v as $x) $var += ($x - $mu) ** 2; $sd = max(sqrt($var / max(1, $n - 1)), sqrt($mu) * 1.1, 1.0);
                 $base = floor($mu) + 0.5; $step = $mu >= 15 ? 3 : ($mu >= 6 ? 2 : 1);
