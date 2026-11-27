@@ -1069,6 +1069,7 @@ var elPicks=document.getElementById('picks');
 function formHTML(f){if(!f||!f.length)return '';return '<span class="form" aria-label="Últimos '+f.length+': '+f.map(function(x){return x==='w'?'ganó':x==='d'?'empató':'perdió';}).join(', ')+'">'+f.map(function(x){return '<i class="'+x+'"></i>';}).join('')+'</span>';}
 function logo(u){return u?'<img class="logo" src="'+esc(u)+'" alt="" loading="lazy" onerror="this.remove()">':'';}
 function renderPicks(){
+  applyInj();
   var th=state.th,list=dayMatches(),q=state.q.trim().toLowerCase();
   var counts={all:0};DATA.sports.forEach(function(s){counts[s.id]=0;});
   var aboveMk=0,matchesWith=0,total=0,rows=[],have={};
@@ -1715,6 +1716,27 @@ function renderInjuries(f){
     return jget(ESPN+'basketball/nba/injuries').then(function(x){draw(x.injuries||[]);});
   }).catch(function(){jget(ESPN+'basketball/nba/injuries').then(function(x){draw(x.injuries||[]);}).catch(function(){});});
 }
+/* Bajas de toda la NBA: los mercados de jugadores que NO juegan o están en duda se quitan de los pronósticos,
+   combinadas y del chat. Se revisa el reporte de ESPN al abrir la página y cada 10 minutos. */
+var INJ_OUT={},INJ_LIST=[],INJ_T=0;
+function injKey(n){return String(n||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
+function loadInjAll(){
+  if(Date.now()-INJ_T<540000)return;INJ_T=Date.now();
+  jget(ESPN+'basketball/nba/injuries').then(function(x){
+    var map={},list=[];
+    (x.injuries||[]).forEach(function(t){(t.injuries||[]).forEach(function(i){var a=i.athlete||{},n=a.displayName||'';if(!n||!i.status||i.status==='Active'||i.status==='Probable')return;
+      map[injKey(n)]={n:n,st:i.status,team:t.displayName||''};list.push({n:n,st:i.status,team:t.displayName||'',why:injReason(i)});});});
+    INJ_OUT=map;INJ_LIST=list;
+    if(DATA){applyInj();if(!overlay.classList.contains('on'))renderPicks();}
+  }).catch(function(){INJ_T=0;});
+}
+function injMk(m){var i=m.n.indexOf(':');if(i<0)return false;return !!INJ_OUT[injKey(m.n.slice(0,i))];}
+function applyInj(){
+  if(!DATA||!INJ_LIST.length)return;
+  DATA.matches.forEach(function(f){if(f.sport!=='basquet')return;
+    if(f.markets.some(injMk))f.markets=f.markets.filter(function(m){return !injMk(m);});
+    if(LIVE_MK[f.id]&&LIVE_MK[f.id].markets&&LIVE_MK[f.id].markets.some(injMk))LIVE_MK[f.id].markets=LIVE_MK[f.id].markets.filter(function(m){return !injMk(m);});});
+}
 /* ---------- EN VIVO: marcador y estadísticas directo desde ESPN (sin video) ---------- */
 var ESPN='https://site.api.espn.com/apis/site/v2/sports/';
 var SOC_SLUG={PL:'eng.1',PD:'esp.1',SA:'ita.1',BL1:'ger.1',FL1:'fra.1',CL:'uefa.champions',PPL:'por.1',DED:'ned.1',ELC:'eng.2',PER:'per.1',ARG:'arg.1',BRA:'bra.1',MEX:'mex.1',COL:'col.1',CHI:'chi.1',LIB:'conmebol.libertadores',SUD:'conmebol.sudamericana',MLS:'usa.1',UEL:'uefa.europa',UECL:'uefa.europa.conf',TUR:'tur.1',SCO:'sco.1',BEL:'bel.1',KSA:'ksa.1',ECU:'ecu.1',URU:'uru.1',PAR:'par.1',BOL:'bol.1',VEN:'ven.1',CRC:'crc.1',GUA:'gua.1',HON:'hon.1',SLV:'slv.1',BRA2:'bra.2',ARG2:'arg.2',MEX2:'mex.2',ESP2:'esp.2',ITA2:'ita.2',GER2:'ger.2',FRA2:'fra.2',ENG3:'eng.3',GRE:'gre.1',AUT:'aut.1',SUI:'sui.1',DEN:'den.1',SWE:'swe.1',NOR:'nor.1',JPN:'jpn.1',KOR:'kor.1',AUS:'aus.1',CDR:'esp.copa_del_rey',FAC:'eng.fa',ELC2:'eng.league_cup',CIT:'ita.coppa_italia',DFB:'ger.dfb_pokal',CDF:'fra.coupe_de_france'};
@@ -2000,7 +2022,7 @@ function boot(){
   DAYS=Object.keys(keys).sort().slice(0,4);if(!DAYS.length)DAYS=[today];
   document.getElementById('heroDate').textContent=new Date().toLocaleDateString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'});
   document.getElementById('navPl').hidden=DATA.mock||!(SPORT_BY.basquet||SPORT_BY.futbol);
-  applyLv();renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,180000);pollVivo();clearInterval(vivoTimer);vivoTimer=setInterval(pollVivo,45000);
+  applyLv();loadInjAll();setInterval(loadInjAll,600000);renderDays();renderMethod();renderPicks();buildHistory();route();startLive();clearInterval(dataTimer);dataTimer=setInterval(refreshData,180000);pollVivo();clearInterval(vivoTimer);vivoTimer=setInterval(pollVivo,45000);
 }
 document.getElementById('year').textContent=new Date().getFullYear();
 // Esports: el marcador viene dentro de los datos (lv). Se recargan los datos cada 2 min mientras haya partidas en juego.
@@ -2167,6 +2189,11 @@ function chContext(userText,withImg){
   var tc=chTargetCombo(userText);
   if(tc){L.push('\nCOMBINADA CALCULADA POR LA PÁGINA (el usuario pidió cuota '+tc.target.toFixed(2)+'): '+tc.token+' → cuota justa total '+(1/tc.p).toFixed(2)+', probabilidad de acertar todas '+pct(tc.p)+'%'+(tc.single?' (mismo partido: las selecciones se relacionan un poco entre sí)':'')+'. Usa EXACTAMENTE esa línea [[combo:...]] en tu respuesta y explica cada selección.');}
   else if(chTarget(userText))L.push('\nNOTA: no se pudo llegar a la cuota pedida con selecciones de 60% o más; dilo y ofrece la más cercana.');
+  applyInj();
+  if(INJ_LIST.length){var teams={};keep.forEach(function(f){if(f.sport==='basquet'){teams[f.home]=1;teams[f.away]=1;}});
+    var inj=INJ_LIST.filter(function(i){return teams[i.team];});
+    if(inj.length){L.push('\nBAJAS NBA (reporte oficial vía ESPN; sus mercados de jugador ya se quitaron; el modelo de equipo NO las descuenta, así que ten cuidado con ganador/totales de equipos con bajas importantes):');
+      inj.forEach(function(i){L.push('- '+i.team+': '+i.n+' · '+((INJ_ST[i.st]||[i.st])[0])+(i.why?' ('+i.why+')':''));});}}
   var nc=chNow().slice(0,10);
   if(nc.length){L.push('\nLO QUE LA PÁGINA RECOMIENDA AHORA ("Métele ahora"):');nc.forEach(function(c){L.push('- ['+c.f.id+'] '+c.m.n+' '+pct(c.m.p)+'%'+(c.live?' (EN VIVO)':' (empieza '+timeStr(c.f.ts)+')')+(c.weak?' · sin jugada clara, mejor esperar':''));});}
   return L.join('\n');
@@ -2242,6 +2269,7 @@ function chSlipLeg(sel){
   // cambia el nombre del equipo de la casa por el de Umbral ("LA Lakers" → "Los Angeles Lakers")
   var ov=function(a,b){var wb=chNorm(b);return chNorm(a).split(/[^a-z0-9]+/).filter(function(w){return w.length>=3&&wb.indexOf(w)>=0;}).length;};
   [sel.local,sel.visitante].forEach(function(nm){if(!nm)return;nm=String(nm);if(name.indexOf(nm)<0)return;var tgt=ov(nm,f.home)>=ov(nm,f.away)?f.home:f.away;name=name.split(nm).join(tgt);});
+  var cut=name.indexOf(':');if(cut>0&&INJ_OUT[injKey(name.slice(0,cut))]){out.inj=INJ_OUT[injKey(name.slice(0,cut))];out.name=name;return out;}
   var all=mkOf(f),n=chNorm(name).trim(),i;
   for(i=0;i<all.length;i++)if(chNorm(all[i].n).trim()===n){out.m=all[i];out.p=all[i].p;out.exact=true;return out;}
   // línea que Umbral no tiene exacta: se estima entre las dos líneas más cercanas del mismo mercado
@@ -2264,7 +2292,7 @@ function chSlipHTML(S){
   S.legs.forEach(function(l){var sel=l.sel,mk=l.m?l.m.n:(sel.mercado||sel.texto||'?'),txt=l.f?(l.f.home+' vs '+l.f.away):((sel.local||'')+' vs '+(sel.visitante||''));
     var val=l.p!=null&&l.cuota>1?(l.cuota*l.p>=1?'<span class="ok">✓ paga bien</span>':'<span class="no">✗ paga poco</span>'):'';
     h+='<button class="r" type="button"'+(l.f?' data-id="'+esc(l.f.id)+'"':' disabled')+'><span class="m"><span>'+esc(l.name&&!l.exact?(sel.mercado||mk):mk)+'</span><span>'+(l.p!=null?pct(l.p)+'%':'—')+(l.cuota>1?' · '+l.cuota.toFixed(2):'')+'</span></span>'+
-      '<span class="t">'+esc(txt)+(l.p!=null?' · justa '+fair(l.p):'')+(l.near?' · estimada entre '+l.near[0]+' y '+l.near[1]:'')+(l.far!=null?' · aprox. (Umbral solo tiene la línea '+l.far+')':'')+(l.p==null?(l.f?' · Umbral no tiene este mercado':' · este partido no está en Umbral'):'')+(val?' · '+val:'')+'</span></button>';});
+      '<span class="t">'+esc(txt)+(l.p!=null?' · justa '+fair(l.p):'')+(l.near?' · estimada entre '+l.near[0]+' y '+l.near[1]:'')+(l.far!=null?' · aprox. (Umbral solo tiene la línea '+l.far+')':'')+(l.inj?' · ⚠ '+esc(l.inj.n)+': '+esc((INJ_ST[l.inj.st]||[l.inj.st])[0])+' según el reporte oficial':l.p==null?(l.f?' · Umbral no tiene este mercado':' · este partido no está en Umbral'):'')+(val?' · '+val:'')+'</span></button>';});
   var fair_=S.found.length?1/S.p:0;
   h+='<div class="f">'+(S.found.length?'<div>Probabilidad de acertar '+(S.missing?'las '+S.found.length+' que conozco':'todas')+': <b>'+pct(S.p)+'%</b> · cuota justa <b>'+fair_.toFixed(2)+'</b></div>':'<div>No encontré estas selecciones en Umbral.</div>')+
     (S.casa&&S.found.length&&!S.missing?'<div>La casa paga <b>'+S.casa.toFixed(2)+'</b> → <span class="v '+(S.casa>=fair_?'ok':'no')+'">'+(S.casa>=fair_*1.02?'tiene valor':S.casa>=fair_*0.95?'casi lo justo':'paga menos de lo que debería')+'</span></div>':'')+
@@ -2272,7 +2300,7 @@ function chSlipHTML(S){
   return h;
 }
 function chSlipText(S){
-  return 'ANÁLISIS DEL BOLETO (calculado por la página con los datos de Umbral, ya mostrado al usuario en una tabla):\n'+S.legs.map(function(l,i){var sel=l.sel;return (i+1)+'. '+(sel.mercado||sel.texto)+' — '+(l.f?l.f.home+' vs '+l.f.away+' ['+l.f.id+']':'partido no encontrado')+' — '+(l.p!=null?'Umbral '+pct(l.p)+'% (justa '+fair(l.p)+')'+(l.near?' estimada entre las líneas '+l.near.join(' y '):'')+(l.far!=null?' aprox. con la línea '+l.far:''):'sin dato en Umbral')+(l.cuota>1?' · casa '+l.cuota.toFixed(2):'');}).join('\n')+
+  return 'ANÁLISIS DEL BOLETO (calculado por la página con los datos de Umbral, ya mostrado al usuario en una tabla):\n'+S.legs.map(function(l,i){var sel=l.sel;return (i+1)+'. '+(sel.mercado||sel.texto)+' — '+(l.f?l.f.home+' vs '+l.f.away+' ['+l.f.id+']':'partido no encontrado')+' — '+(l.inj?'JUGADOR DE BAJA ('+l.inj.st+'): quítala del boleto':l.p!=null?'Umbral '+pct(l.p)+'% (justa '+fair(l.p)+')'+(l.near?' estimada entre las líneas '+l.near.join(' y '):'')+(l.far!=null?' aprox. con la línea '+l.far:''):'sin dato en Umbral')+(l.cuota>1?' · casa '+l.cuota.toFixed(2):'');}).join('\n')+
     '\nTOTAL: probabilidad de acertar '+(S.missing?'las que conozco':'todas')+' '+pct(S.p)+'% · cuota justa '+(1/S.p).toFixed(2)+(S.casa?' · la casa paga '+S.casa.toFixed(2):'');
 }
 function chNow(){var s=state.sport;state.sport='all';var r=[];try{r=nowCands();}catch(e){}state.sport=s;return r;}
