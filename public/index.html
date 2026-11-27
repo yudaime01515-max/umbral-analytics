@@ -2117,14 +2117,17 @@ function chContext(userText){
   var keep=DATA.matches.filter(function(f){var st=liveState(f);return st!=='done'&&(st==='live'||f.ts<now+36*3600);});
   // partidos que el usuario nombró: siempre entran, con más mercados
   var named={};
-  if(txt.length>2)DATA.matches.forEach(function(f){if(liveState(f)==='done')return;[f.home,f.away].forEach(function(t){var w=chNorm(t);if(w.length>=4&&txt.indexOf(w)>=0)named[f.id]=1;});});
+  // basta una palabra del nombre ("detroit", "bremen", "spirit"); se ignoran palabras comunes como "united" o "city"
+  var CH_STOP={united:1,city:1,club:1,sport:1,sporting:1,real:1,atletico:1,deportivo:1,esports:1,gaming:1,team:1,academy:1,county:1,athletic:1,racing:1,union:1,women:1,junior:1,juniors:1,national:1};
+  var words={};txt.split(/[^a-z0-9]+/).forEach(function(w){if(w.length>=4)words[w]=1;});
+  if(txt.length>2)DATA.matches.forEach(function(f){if(liveState(f)==='done')return;[f.home,f.away].forEach(function(t){var w=chNorm(t);if(w.length>=4&&txt.indexOf(w)>=0)named[f.id]=1;w.split(/[^a-z0-9]+/).forEach(function(x){if(x.length>=5&&!CH_STOP[x]&&words[x])named[f.id]=1;});});});
   DATA.matches.forEach(function(f){if(named[f.id]&&keep.indexOf(f)<0)keep.push(f);});
   keep.sort(function(a,b){var la=liveState(a)==='live'?0:1,lb=liveState(b)==='live'?0:1;return (named[b.id]?1:0)-(named[a.id]?1:0)||la-lb||a.ts-b.ts;});
   L.push('\nPARTIDOS (ID · hora · deporte · liga · partido · estado · mercados con su probabilidad, cuota justa y cuota de la casa si existe):');
   var count=0;
   keep.forEach(function(f){
     if(count>=(220+Object.keys(named).length))return;
-    var big=!!named[f.id],lim=big?16:6,per={},list=mkOf(f).filter(function(m){return m.p>=(big?0.5:0.58)&&m.p<0.97;}).sort(function(a,b){return b.p-a.p;}),out=[];
+    var big=!!named[f.id],lim=big?24:6,per={},list=mkOf(f).filter(function(m){return m.p>=(big?0.5:0.58)&&m.p<0.97;}).sort(function(a,b){return b.p-a.p;}),out=[];
     list.forEach(function(m){if(out.length>=lim)return;var g=mkGroup(f,m.n);per[g]=(per[g]||0)+1;if(per[g]>(big?6:(g==='Jugadores'?3:2)))return;
       out.push(m.n+' '+pct(m.p)+'% (justa '+fair(m.p)+(m.q?', casa '+(+m.q).toFixed(2):'')+')');});
     if(!out.length)return;

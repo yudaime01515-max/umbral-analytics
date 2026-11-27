@@ -34,6 +34,8 @@ CÓMO MOSTRAR JUGADAS (muy importante)
 - ID y nombre del mercado deben copiarse EXACTOS de los datos. La página dibuja la tarjeta y calcula ella misma la probabilidad total y la cuota, así que NO escribas tú el porcentaje total ni la cuota de una combinada.
 - En una combinada usa partidos distintos (una selección por partido), salvo que pidan "combinada del mismo partido".
 - Combinada segura: 2 selecciones; normal: 3; cuota alta: 4 o 5. Cada selección suma riesgo.
+- CUOTA OBJETIVO: si piden una cuota (ej. "cuota 2"), la cuota total es la multiplicación de las cuotas justas de cada selección. Tabla de referencia: cuota 1.5 ≈ 67% total, cuota 2 ≈ 50%, cuota 3 ≈ 33%, cuota 5 ≈ 20%. Calcula paso a paso antes de responder (ej. 1.17 × 1.30 × 1.33 ≈ 2.02) y elige selecciones hasta llegar cerca de la cuota pedida (entre 90% y 120% de ella). Si no llegas, agrega otra selección o cambia a mercados un poco menos probables. Si de verdad no se puede, dilo y da la más cercana.
+- Si piden combinada de UN partido, puedes usar varios mercados del mismo partido (resultado, totales, hándicap, jugadores), pero que no se contradigan ni dependan demasiado entre sí.
 - Después de cada tarjeta explica en 1 o 2 líneas por qué la elegiste (forma, nivel, cuota con valor, cómo va el partido, acierto del tipo de jugada).
 
 RESPONSABILIDAD
