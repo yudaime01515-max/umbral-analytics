@@ -2116,11 +2116,7 @@ function chContext(userText){
   }
   var keep=DATA.matches.filter(function(f){var st=liveState(f);return st!=='done'&&(st==='live'||f.ts<now+36*3600);});
   // partidos que el usuario nombró: siempre entran, con más mercados
-  var named={};
-  // basta una palabra del nombre ("detroit", "bremen", "spirit"); se ignoran palabras comunes como "united" o "city"
-  var CH_STOP={united:1,city:1,club:1,sport:1,sporting:1,real:1,atletico:1,deportivo:1,esports:1,gaming:1,team:1,academy:1,county:1,athletic:1,racing:1,union:1,women:1,junior:1,juniors:1,national:1};
-  var words={};txt.split(/[^a-z0-9]+/).forEach(function(w){if(w.length>=4)words[w]=1;});
-  if(txt.length>2)DATA.matches.forEach(function(f){if(liveState(f)==='done')return;[f.home,f.away].forEach(function(t){var w=chNorm(t);if(w.length>=4&&txt.indexOf(w)>=0)named[f.id]=1;w.split(/[^a-z0-9]+/).forEach(function(x){if(x.length>=5&&!CH_STOP[x]&&words[x])named[f.id]=1;});});});
+  var named={};chNamed(txt).forEach(function(f){named[f.id]=1;});
   DATA.matches.forEach(function(f){if(named[f.id]&&keep.indexOf(f)<0)keep.push(f);});
   keep.sort(function(a,b){var la=liveState(a)==='live'?0:1,lb=liveState(b)==='live'?0:1;return (named[b.id]?1:0)-(named[a.id]?1:0)||la-lb||a.ts-b.ts;});
   L.push('\nPARTIDOS (ID · hora · deporte · liga · partido · estado · mercados con su probabilidad, cuota justa y cuota de la casa si existe):');
@@ -2137,9 +2133,64 @@ function chContext(userText){
     if(big&&f.exp)f.exp.forEach(function(x){extra.push(x[0]+': '+x[1]);});
     L.push('['+f.id+'] '+(live?'EN VIVO '+chScore(f):dayLabel(dayKey(f.ts))+' '+timeStr(f.ts))+' · '+chSport(f)+' · '+chShort(f.league,48)+' · '+f.home+' vs '+f.away+(extra.length?' · '+extra.join('; '):'')+'\n   '+out.join(' | '));
   });
+  var tc=chTargetCombo(userText);
+  if(tc){L.push('\nCOMBINADA CALCULADA POR LA PÁGINA (el usuario pidió cuota '+tc.target.toFixed(2)+'): '+tc.token+' → cuota justa total '+(1/tc.p).toFixed(2)+', probabilidad de acertar todas '+pct(tc.p)+'%'+(tc.single?' (mismo partido: las selecciones se relacionan un poco entre sí)':'')+'. Usa EXACTAMENTE esa línea [[combo:...]] en tu respuesta y explica cada selección.');}
+  else if(chTarget(userText))L.push('\nNOTA: no se pudo llegar a la cuota pedida con selecciones de 60% o más; dilo y ofrece la más cercana.');
   var nc=chNow().slice(0,10);
   if(nc.length){L.push('\nLO QUE LA PÁGINA RECOMIENDA AHORA ("Métele ahora"):');nc.forEach(function(c){L.push('- ['+c.f.id+'] '+c.m.n+' '+pct(c.m.p)+'%'+(c.live?' (EN VIVO)':' (empieza '+timeStr(c.f.ts)+')')+(c.weak?' · sin jugada clara, mejor esperar':''));});}
   return L.join('\n');
+}
+var CH_STOP={futbol:1,football:1,basket:1,basquet:1,partido:1,partidos:1,combinada:1,combianda:1,cuota:1,hockey:1,tenis:1,valorant:1,manana:1,united:1,city:1,club:1,sport:1,sporting:1,real:1,atletico:1,deportivo:1,esports:1,gaming:1,team:1,academy:1,county:1,athletic:1,racing:1,union:1,women:1,junior:1,juniors:1,national:1};
+// partidos que el usuario nombró: basta una palabra del nombre ("detroit", "bremen"); se ignoran palabras comunes
+function chNamed(txt){
+  var words={},out=[];txt=chNorm(txt);txt.split(/[^a-z0-9]+/).forEach(function(w){if(w.length>=4)words[w]=1;});
+  if(txt.length<3||!DATA)return out;
+  DATA.matches.forEach(function(f){if(liveState(f)==='done')return;var hit=false;
+    [f.home,f.away].forEach(function(t){var w=chNorm(t);if(w.length>=4&&txt.indexOf(w)>=0)hit=true;w.split(/[^a-z0-9]+/).forEach(function(x){if(x.length>=5&&!CH_STOP[x]&&words[x])hit=true;});});
+    if(hit)out.push(f);});
+  return out;
+}
+function chSportsIn(txt){var sp=null;txt=chNorm(txt);CH_SPORTS.forEach(function(x){if(x[0].test(txt))sp=(sp||[]).concat(x[1]);});return sp;}
+function chTarget(txt){var m=chNorm(txt).match(/cuota\s*(?:de\s*|a\s*)?(\d+(?:[.,]\d+)?)/);if(!m)return 0;var v=parseFloat(m[1].replace(',','.'));return v>1.05&&v<=50?v:0;}
+/* Combinada para una cuota pedida: va sumando las selecciones más probables (corregidas con el acierto real del historial)
+   hasta llegar a la cuota. En un solo partido usa un mercado por tipo (resultado, totales, cada jugador…) para que no se pisen. */
+function chTargetCombo(text){
+  var target=chTarget(text);if(!target||!DATA)return null;
+  var t=chNorm(text),now=Date.now()/1000,sp=chSportsIn(t),okSp=function(f){return !sp||sp.indexOf(f.sport)>=0;};
+  var named=chNamed(t).filter(okSp),single=named.length>0,pool=[];
+  var adj=function(f,m){var g=calGroup(f.sport,m.r&&m.r[0]);return g?m.p*(g.real/g.pred):m.p;};
+  var playable=function(f){var st=liveState(f);return st==='pre'||(st==='live'&&isLiveMk(f));};
+  if(single){
+    named.sort(function(a,b){return a.ts-b.ts;});var f=named.filter(playable)[0]||named[0],seen={};
+    mkOf(f).forEach(function(m){if(m.p<0.6||m.p>0.95)return;var g=mkGroup(f,m.n),key=g==='Jugadores'?'J:'+m.n.split(':')[0]:g==='Partido'||g==='Resultado y goles'?(m.r&&m.r[0])||m.n:g;pool.push({f:f,m:m,key:key,s:adj(f,m)});});
+    pool.sort(function(a,b){return b.s-a.s;});pool=pool.filter(function(x){if(seen[x.key])return false;seen[x.key]=1;return true;});
+  }else{
+    var today=/\bhoy\b/.test(t),end=today?(function(){var d=dayKey(now),e=now;while(dayKey(e)===d)e+=1800;return e;})():now+36*3600;
+    DATA.matches.forEach(function(f){if(!okSp(f)||liveState(f)!=='pre'||f.ts<now+300||f.ts>end)return;var best=null;
+      f.markets.forEach(function(m){if(m.p<0.6||m.p>0.95||!comboLegOk(f,m))return;var sc=adj(f,m);if(!best||sc>best.s)best={f:f,m:m,s:sc};});if(best)pool.push(best);});
+    pool.sort(function(a,b){return b.s-a.s;});
+    // por partido, el mercado que mejor se acerca a lo que pide cada selección en una combinada de 4 (para el plan B)
+    var need4=Math.pow(1/target,1/4),alt=[];
+    DATA.matches.forEach(function(f){if(!okSp(f)||liveState(f)!=='pre'||f.ts<now+300||f.ts>end)return;var b=null;
+      f.markets.forEach(function(m){if(m.p<Math.max(0.6,need4)||m.p>0.95||!comboLegOk(f,m))return;if(!b||m.p<b.m.p)b={f:f,m:m,s:adj(f,m)};});if(b)alt.push(b);});
+    pool.alt=alt;
+  }
+  // para cada cantidad de selecciones: las k-1 más probables + la k-ésima que deje la cuota más cerca de lo pedido;
+  // gana la que quede más cerca (sin pasarse de +15% ni quedarse bajo -7%), y a igual distancia, la de menos selecciones
+  var legs=null,bestD=1e9;
+  for(var k=2;k<=8&&k<=pool.length;k++){
+    var base=1;for(var i=0;i<k-1;i++)base/=pool[i].m.p;
+    if(base>=target*1.15)break;
+    for(var j=k-1;j<pool.length;j++){var o=base/pool[j].m.p,d=Math.abs(o-target)/target;
+      if(o<target*0.93||o>target*1.15)continue;
+      if(d<bestD-0.02){bestD=d;legs=pool.slice(0,k-1).concat([pool[j]]);}}
+  }
+  // plan B (cuotas más altas): k partidos con la probabilidad justa que hace falta en cada uno (raíz k-ésima)
+  if(!legs&&!single){var src=(pool.alt||[]).concat(pool);[4,3,5,6].some(function(k){var need=Math.pow(1/target,1/k),seenF={},c=src.filter(function(x){if(seenF[x.f.id]||x.m.p<need)return false;seenF[x.f.id]=1;return true;}).filter(function(x){return x.m.p>=need;}).sort(function(a,b){return a.m.p-b.m.p;});
+    if(c.length<k)return false;var pick=c.slice(0,k),o=1;pick.forEach(function(x){o/=x.m.p;});if(o<target*0.85)return false;legs=pick;return true;});}
+  if(!legs)return null;
+  var p=1;legs.forEach(function(l){p*=l.m.p;});
+  return {target:target,p:p,single:single,legs:legs,token:'[[combo:'+legs.map(function(l){return l.f.id+'|'+l.m.n;}).join(';')+']]'};
 }
 function chNow(){var s=state.sport;state.sport='all';var r=[];try{r=nowCands();}catch(e){}state.sport=s;return r;}
 
@@ -2207,6 +2258,9 @@ function chLocal(text){
     return (c[0].live?'Esto es lo mejor en este momento:':'No hay nada claro en vivo, pero esto empieza pronto:')+'\n'+c.map(function(x){return '[[pick:'+x.f.id+'|'+x.m.n+']]';}).join('\n')+'\nSi tu casa paga menos que la cuota justa, no la juegues.';
   }
   var upcoming=DATA.matches.filter(function(f){return liveState(f)==='pre'&&f.ts>now+300&&f.ts<now+36*3600&&okSp(f);});
+  var tc=chTargetCombo(text);
+  if(tc)return 'Para llegar a cuota '+tc.target.toFixed(2)+' junté lo más probable'+(tc.single?' de **'+tc.legs[0].f.home+' vs '+tc.legs[0].f.away+'**':'')+':\n'+tc.token+(tc.single?'\nSon del mismo partido, así que se relacionan un poco entre sí.':'')+'\nFallar una sola selección pierde toda la combinada.';
+  if(chTarget(text))return 'No llego a cuota '+chTarget(text).toFixed(2)+' con selecciones de 60% o más'+(spName?' de '+spName:'')+'. Prueba con una cuota más baja u otro partido.';
   if(/combinad|parlay|combo/.test(t)){
     var k=/segur|tranqui|2 sel|de 2\b|doble/.test(t)?2:/alta|arriesg|grande|bomba|millon/.test(t)?4:3,nm=t.match(/de (\d)\b/);if(nm)k=Math.max(2,Math.min(6,+nm[1]));
     var T={2:0.75,3:0.6,4:0.5,5:0.4,6:0.33}[k],need=Math.pow(T,1/k),legs=[];
