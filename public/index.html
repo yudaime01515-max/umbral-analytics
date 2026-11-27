@@ -2083,7 +2083,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawRuler);
    La IA de verdad (Gemini) vive detrás de un Worker de Cloudflare que guarda la clave secreta.
    Pega abajo el enlace de tu Worker (termina en .workers.dev). Si está vacío o la IA no responde,
    el chat sigue funcionando en "modo básico": entiende órdenes simples y arma las jugadas con los mismos datos. */
-var CHAT_API='';
+var CHAT_API='https://umbral-chat.yudaime01515.workers.dev/';
 var CH_MSGS=[],CH_BUSY=false,CH_COMBOS=[];
 var chPanel=document.getElementById('chPanel'),chLog=document.getElementById('chLog'),chIn=document.getElementById('chIn'),chFab=document.getElementById('chFab'),chSend=document.getElementById('chSend');
 var CH_TYPES={res:'ganador del partido',tot:'más/menos (totales)',dc:'doble oportunidad',btts:'ambos marcan',hcp:'hándicap',sets_one:'gana al menos un mapa/set',tscore:'equipo marca',st:'tiros/estadísticas'};
