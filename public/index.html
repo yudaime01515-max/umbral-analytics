@@ -847,6 +847,88 @@ nav.views a[aria-current="page"]::after{
   </div>
 </div>
 
+<style>
+/* ---------- chat con el cerebro ---------- */
+.ch-fab{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:12px 18px 12px 14px;background:var(--accent);color:#1A0A05;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 14px 40px -10px rgba(255,90,54,.6),0 4px 14px rgba(0,0,0,.4);transition:transform .15s}
+.ch-fab:hover{transform:translateY(-2px)}
+.ch-fab svg{flex:none}
+body.ch-open .ch-fab{display:none}
+.ch-panel{position:fixed;right:18px;bottom:18px;z-index:61;width:400px;max-width:calc(100vw - 24px);height:min(640px,calc(100vh - 36px));display:none;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 30px 80px -20px rgba(0,0,0,.85),0 0 0 1px rgba(255,90,54,.1)}
+body.ch-open .ch-panel{display:flex}
+@media(max-width:560px){.ch-panel{right:0;bottom:0;width:100vw;max-width:100vw;height:100dvh;border-radius:0;border:0}}
+.ch-head{display:flex;align-items:center;gap:10px;padding:14px 14px 12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,90,54,.10),transparent)}
+.ch-av{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#1A0A05;display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:19px;flex:none}
+.ch-title{flex:1;min-width:0}
+.ch-title b{display:block;font-size:15px}
+.ch-title span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-title span i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--good);margin-right:5px;vertical-align:1px}
+.ch-title span i.off{background:#F5B941}
+.ch-x{background:none;border:0;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px;display:grid;place-items:center}
+.ch-x:hover{color:var(--text);background:var(--panel-2)}
+.ch-log{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.ch-m{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.5;overflow-wrap:anywhere}
+.ch-m.u{align-self:flex-end;background:var(--accent);color:#1A0A05;border-bottom-right-radius:4px;font-weight:600}
+.ch-m.b{align-self:flex-start;background:var(--panel-2);border:1px solid var(--line);border-bottom-left-radius:4px;max-width:96%}
+.ch-m.b ul{margin:4px 0;padding-left:18px}
+.ch-m.b li{margin:2px 0}
+.ch-m.b p{margin:0 0 6px}.ch-m.b p:last-child{margin:0}
+.ch-m.err{border-color:rgba(248,113,113,.5);color:#FCA5A5}
+.ch-typing{display:inline-flex;gap:4px;padding:4px 2px}
+.ch-typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:chDot 1.2s infinite}
+.ch-typing i:nth-child(2){animation-delay:.15s}.ch-typing i:nth-child(3){animation-delay:.3s}
+@keyframes chDot{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.ch-card{display:block;width:100%;text-align:left;margin:8px 0;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--text)}
+.ch-card:hover{border-color:var(--accent)}
+.ch-card .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:flex;justify-content:space-between;gap:8px}
+.ch-card .mk{font-weight:700;font-size:15px;margin:3px 0 1px;display:flex;justify-content:space-between;gap:10px}
+.ch-card .mk b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.ch-card .t{color:var(--muted);font-size:12.5px}
+.ch-combo{margin:8px 0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ch-combo .h{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px 6px;gap:8px}
+.ch-combo .h span{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.ch-combo .h b{font-family:var(--display);font-size:24px;font-weight:900;font-variant-numeric:tabular-nums}
+.ch-combo .lg{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:8px 12px;cursor:pointer;color:var(--text)}
+.ch-combo .lg:hover{background:var(--panel)}
+.ch-combo .lg .m{font-weight:600;font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.ch-combo .lg .t{color:var(--muted);font-size:12px}
+.ch-combo .f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.ch-combo .f button{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;color:var(--text);cursor:pointer;font-size:12px}
+.ch-quick{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;scrollbar-width:none}
+.ch-quick::-webkit-scrollbar{display:none}
+.ch-quick button{flex:none;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap}
+.ch-quick button:hover{border-color:var(--accent);color:var(--accent)}
+.ch-form{display:flex;gap:8px;padding:10px 12px 12px;align-items:flex-end}
+.ch-form textarea{flex:1;resize:none;min-height:44px;max-height:120px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);padding:11px 12px;font-size:15px;line-height:1.4}
+.ch-form textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.ch-send{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:var(--accent);color:#1A0A05;cursor:pointer;display:grid;place-items:center}
+.ch-send:disabled{opacity:.45;cursor:default}
+body.slip-on .ch-fab{right:auto;left:18px}
+.ch-foot{color:var(--muted);font-size:11px;text-align:center;padding:0 12px 10px}
+</style>
+<button class="ch-fab" id="chFab" type="button" aria-controls="chPanel" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Pregúntale a Umbral</button>
+<section class="ch-panel" id="chPanel" role="dialog" aria-label="Chat con el cerebro de Umbral">
+  <div class="ch-head">
+    <div class="ch-av" aria-hidden="true">U</div>
+    <div class="ch-title"><b>Cerebro de Umbral</b><span id="chStatus"><i></i>Usa los pronósticos de hoy</span></div>
+    <button class="ch-x" id="chClear" type="button" title="Borrar conversación" aria-label="Borrar conversación"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+    <button class="ch-x" id="chClose" type="button" aria-label="Cerrar chat"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="ch-log" id="chLog" aria-live="polite"></div>
+  <div class="ch-quick" id="chQuick">
+    <button type="button">Hazme una combinada de hoy</button>
+    <button type="button">¿Qué le meto ahora en vivo?</button>
+    <button type="button">Lo más seguro del día</button>
+    <button type="button">Combinada de esports</button>
+    <button type="button">NBA de hoy</button>
+    <button type="button">Combinada de cuota alta</button>
+  </div>
+  <form class="ch-form" id="chForm">
+    <label for="chIn" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Escribe tu pregunta</label>
+    <textarea id="chIn" rows="1" placeholder="Ej: combinada de 3 con fútbol y NBA"></textarea>
+    <button class="ch-send" id="chSend" type="submit" aria-label="Enviar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </form>
+  <div class="ch-foot">Son probabilidades, no fijas. Apuesta solo lo que puedas perder.</div>
+</section>
 <script>
 (function(){
 'use strict';
@@ -1996,6 +2078,209 @@ document.addEventListener('keydown',function(e){if(e.key!=='Escape')return;if(pO
 window.addEventListener('resize',drawRuler);
 window.addEventListener('hashchange',route);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawRuler);
+
+/* ---------- chat con el cerebro de Umbral ----------
+   La IA de verdad (Gemini) vive detrás de un Worker de Cloudflare que guarda la clave secreta.
+   Pega abajo el enlace de tu Worker (termina en .workers.dev). Si está vacío o la IA no responde,
+   el chat sigue funcionando en "modo básico": entiende órdenes simples y arma las jugadas con los mismos datos. */
+var CHAT_API='';
+var CH_MSGS=[],CH_BUSY=false,CH_COMBOS=[];
+var chPanel=document.getElementById('chPanel'),chLog=document.getElementById('chLog'),chIn=document.getElementById('chIn'),chFab=document.getElementById('chFab'),chSend=document.getElementById('chSend');
+var CH_TYPES={res:'ganador del partido',tot:'más/menos (totales)',dc:'doble oportunidad',btts:'ambos marcan',hcp:'hándicap',sets_one:'gana al menos un mapa/set',tscore:'equipo marca',st:'tiros/estadísticas'};
+var CH_ES={cs2:1,dota2:1,lol:1,valorant:1,r6:1,ow:1,mlbb:1,sc2:1};
+function chNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function chMatch(id){if(!DATA)return null;for(var i=0;i<DATA.matches.length;i++)if(DATA.matches[i].id===id)return DATA.matches[i];return null;}
+function chMk(f,name){
+  var all=mkOf(f).concat(f.markets),n=chNorm(name).trim(),i;
+  for(i=0;i<all.length;i++)if(all[i].n===name)return all[i];
+  for(i=0;i<all.length;i++)if(chNorm(all[i].n).trim()===n)return all[i];
+  for(i=0;i<all.length;i++)if(n.length>4&&chNorm(all[i].n).indexOf(n)>=0)return all[i];
+  return null;
+}
+function chScore(f){var L=LIVE[f.id]||f.lv;return L&&L.hs!=null?L.hs+'-'+L.as+(L.txt?' '+L.txt:''):'';}
+function chWhen(f){return liveState(f)==='live'?'EN VIVO'+(chScore(f)?' · '+chScore(f):''):dayLabel(dayKey(f.ts))+' '+timeStr(f.ts);}
+function chSport(f){return (SPORT_BY[f.sport]||{name:f.sport}).name;}
+function chShort(s,n){s=String(s||'');return s.length>n?s.slice(0,n-1)+'…':s;}
+
+/* --- lo que la IA sabe: un resumen compacto de los datos del día --- */
+function chContext(userText){
+  var now=Date.now()/1000,L=[],th=state.th,txt=chNorm(userText);
+  L.push('Ahora en Lima: '+new Date().toLocaleString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}));
+  L.push('Umbral (probabilidad mínima) elegido por el usuario: '+pct(th)+'%');
+  if(BRAIN)L.push('El cerebro ya aprendió de '+BRAIN.n+' pronósticos cerrados.');
+  if(CAL&&CAL.global)L.push('Acierto real global: '+Math.round(CAL.global.real*100)+'% de '+CAL.global.n+' pronósticos (el modelo prometía '+Math.round(CAL.global.pred*100)+'%).');
+  if(CAL&&CAL.grupos){
+    L.push('\nCALIBRACIÓN (deporte | tipo de jugada: acierto real vs prometido, n):');
+    Object.keys(CAL.grupos).forEach(function(k){var g=CAL.grupos[k];if(g.n<8)return;var p=k.split('|');
+      L.push('- '+((SPORT_BY[p[0]]||{name:p[0]}).name)+' | '+(CH_TYPES[p[1]]||p[1])+': '+Math.round(g.real*100)+'% real vs '+Math.round(g.pred*100)+'% prometido ('+g.ok+'/'+g.n+')');});
+  }
+  var keep=DATA.matches.filter(function(f){var st=liveState(f);return st!=='done'&&(st==='live'||f.ts<now+36*3600);});
+  // partidos que el usuario nombró: siempre entran, con más mercados
+  var named={};
+  if(txt.length>2)DATA.matches.forEach(function(f){if(liveState(f)==='done')return;[f.home,f.away].forEach(function(t){var w=chNorm(t);if(w.length>=4&&txt.indexOf(w)>=0)named[f.id]=1;});});
+  DATA.matches.forEach(function(f){if(named[f.id]&&keep.indexOf(f)<0)keep.push(f);});
+  keep.sort(function(a,b){var la=liveState(a)==='live'?0:1,lb=liveState(b)==='live'?0:1;return (named[b.id]?1:0)-(named[a.id]?1:0)||la-lb||a.ts-b.ts;});
+  L.push('\nPARTIDOS (ID · hora · deporte · liga · partido · estado · mercados con su probabilidad, cuota justa y cuota de la casa si existe):');
+  var count=0;
+  keep.forEach(function(f){
+    if(count>=(220+Object.keys(named).length))return;
+    var big=!!named[f.id],lim=big?16:6,per={},list=mkOf(f).filter(function(m){return m.p>=(big?0.5:0.58)&&m.p<0.97;}).sort(function(a,b){return b.p-a.p;}),out=[];
+    list.forEach(function(m){if(out.length>=lim)return;var g=mkGroup(f,m.n);per[g]=(per[g]||0)+1;if(per[g]>(big?6:(g==='Jugadores'?3:2)))return;
+      out.push(m.n+' '+pct(m.p)+'% (justa '+fair(m.p)+(m.q?', casa '+(+m.q).toFixed(2):'')+')');});
+    if(!out.length)return;
+    count++;
+    var live=liveState(f)==='live',extra=[];
+    if(f.formH&&f.formH.length)extra.push('forma '+f.formH.join('').toUpperCase()+' vs '+(f.formA||[]).join('').toUpperCase());
+    if(big&&f.exp)f.exp.forEach(function(x){extra.push(x[0]+': '+x[1]);});
+    L.push('['+f.id+'] '+(live?'EN VIVO '+chScore(f):dayLabel(dayKey(f.ts))+' '+timeStr(f.ts))+' · '+chSport(f)+' · '+chShort(f.league,48)+' · '+f.home+' vs '+f.away+(extra.length?' · '+extra.join('; '):'')+'\n   '+out.join(' | '));
+  });
+  var nc=chNow().slice(0,10);
+  if(nc.length){L.push('\nLO QUE LA PÁGINA RECOMIENDA AHORA ("Métele ahora"):');nc.forEach(function(c){L.push('- ['+c.f.id+'] '+c.m.n+' '+pct(c.m.p)+'%'+(c.live?' (EN VIVO)':' (empieza '+timeStr(c.f.ts)+')')+(c.weak?' · sin jugada clara, mejor esperar':''));});}
+  return L.join('\n');
+}
+function chNow(){var s=state.sport;state.sport='all';var r=[];try{r=nowCands();}catch(e){}state.sport=s;return r;}
+
+/* --- dibujar tarjetas de jugadas y combinadas --- */
+function chPickHTML(id,name){
+  var f=chMatch(id),m=f&&chMk(f,name);if(!m)return null;
+  return '<button class="ch-card" type="button" data-id="'+esc(f.id)+'"><span class="k"><span>'+esc(chSport(f))+' · '+esc(chShort(f.league,30))+'</span><span>'+esc(chWhen(f))+'</span></span>'+
+    '<span class="mk"><span>'+esc(m.n)+'</span><b>'+pct(m.p)+'%</b></span>'+
+    '<span class="t">'+esc(f.home+' vs '+f.away)+' · cuota justa '+fair(m.p)+(m.q?' · casa '+(+m.q).toFixed(2):'')+'</span></button>';
+}
+function chComboHTML(legs){
+  var p=1;legs.forEach(function(l){p*=l.m.p;});
+  var ix=CH_COMBOS.push(legs)-1;
+  return '<div class="ch-combo"><div class="h"><span>Combinada · '+legs.length+' selecciones</span><b>'+(1/p).toFixed(2)+'</b></div>'+
+    legs.map(function(l){return '<button class="lg" type="button" data-id="'+esc(l.f.id)+'"><span class="m"><span>'+esc(l.m.n)+'</span><span>'+pct(l.m.p)+'%</span></span><span class="t">'+esc(l.f.home+' vs '+l.f.away)+' · '+esc(chSport(l.f))+' · '+esc(chWhen(l.f))+'</span></button>';}).join('')+
+    '<div class="f"><span>Acertar todas: <b style="color:var(--text)">'+pct(p)+'%</b> · cuota justa</span><button type="button" data-chcopy="'+ix+'">Copiar</button></div></div>';
+}
+function chToken(kind,body){
+  if(kind==='pick'){var a=body.split('|');return chPickHTML(a[0].trim(),a.slice(1).join('|').trim());}
+  var legs=[];body.split(';').forEach(function(part){var a=part.split('|');if(a.length<2)return;var f=chMatch(a[0].trim()),m=f&&chMk(f,a.slice(1).join('|').trim());if(m)legs.push({f:f,m:m});});
+  return legs.length>=2?chComboHTML(legs):legs.length===1?chPickHTML(legs[0].f.id,legs[0].m.n):null;
+}
+function chRender(t){
+  var blocks=[];
+  t=String(t||'').replace(/\[\[(pick|combo):([^\]]+)\]\]/g,function(all,k,b){var h=chToken(k,b);if(!h)return '';blocks.push(h);return '\u0001'+(blocks.length-1)+'\u0001';});
+  var html='',inList=false;
+  t.split('\n').forEach(function(line){
+    var s=line.trim();
+    var fmt=function(x){return esc(x).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g,'$1<i>$2</i>').replace(/\u0001(\d+)\u0001/g,function(a,i){return blocks[+i]||'';});};
+    var li=s.match(/^(?:[-*•]|\d+[.)])\s+(.*)$/);
+    if(li&&li[1].indexOf('\u0001')<0){if(!inList){html+='<ul>';inList=true;}html+='<li>'+fmt(li[1])+'</li>';return;}
+    if(inList){html+='</ul>';inList=false;}
+    if(!s)return;
+    s=s.replace(/^#{1,4}\s*/,'');
+    html+=(s.indexOf('\u0001')>=0?'<div>'+fmt(li?li[1]:s)+'</div>':'<p>'+fmt(s)+'</p>');
+  });
+  if(inList)html+='</ul>';
+  return html||'<p>…</p>';
+}
+function chAdd(role,text,cls){
+  var d=document.createElement('div');d.className='ch-m '+(role==='user'?'u':'b')+(cls?' '+cls:'');
+  if(role==='user')d.textContent=text;else d.innerHTML=chRender(text);
+  chLog.appendChild(d);chLog.scrollTop=chLog.scrollHeight;return d;
+}
+
+/* --- modo básico: entiende órdenes simples sin IA --- */
+var CH_SPORTS=[[/futbol|liga|gol|corner|tarjeta/,['futbol']],[/nba|basquet|basket|baloncesto/,['basquet']],[/tenis/,['tenis']],[/esport|e-sport/,Object.keys(CH_ES)],
+  [/\bcs\b|cs2|counter/,['cs2']],[/dota/,['dota2']],[/valorant|valo\b/,['valorant']],[/\blol\b|league of legends/,['lol']],[/hockey|nhl/,['hockey']],[/\bnfl\b|americano/,['nfl']],[/ufc|mma/,['mma']],[/mobile legends|mlbb/,['mlbb']],[/overwatch/,['ow']],[/rainbow|r6/,['r6']]];
+function chLocal(text){
+  if(!DATA)return 'Todavía estoy cargando los partidos. Prueba en unos segundos.';
+  var t=chNorm(text),now=Date.now()/1000,sp=null;
+  CH_SPORTS.forEach(function(x){if(x[0].test(t))sp=(sp||[]).concat(x[1]);});
+  var okSp=function(f){return !sp||sp.indexOf(f.sport)>=0;};
+  var spName=sp?(sp.length>2?'esports':(SPORT_BY[sp[0]]||{name:sp[0]}).name):'';
+  // ¿nombró un equipo?
+  var team=DATA.matches.filter(function(f){if(liveState(f)==='done')return false;return [f.home,f.away].some(function(n){var w=chNorm(n);return w.length>=4&&t.indexOf(w)>=0;});});
+  if(team.length&&!/combinad|parlay/.test(t)){
+    var f=team[0],ms=mkOf(f).filter(function(m){return m.p>=0.6&&m.p<=0.92;}).sort(function(a,b){return b.p-a.p;}).slice(0,3);
+    if(!ms.length)return 'Encontré **'+f.home+' vs '+f.away+'**, pero ningún mercado está entre 60% y 92% ahora mismo. Ábrelo para ver todo:\n[[pick:'+f.id+'|'+mkOf(f).slice().sort(function(a,b){return b.p-a.p;})[0].n+']]';
+    return 'Lo mejor de **'+f.home+' vs '+f.away+'**:\n'+ms.map(function(m){return '[[pick:'+f.id+'|'+m.n+']]';}).join('\n');
+  }
+  if(/vivo|ahora|en juego|meto|meterle|metele/.test(t)){
+    var c=chNow().filter(function(x){return okSp(x.f)&&!x.weak;}).slice(0,4);
+    if(!c.length)return 'Ahora mismo no hay ninguna jugada clara en vivo'+(spName?' de '+spName:'')+' (nada pasa de 72%). Mejor espera: cuando alguna aparezca, te sale arriba en **Métele ahora**.';
+    return (c[0].live?'Esto es lo mejor en este momento:':'No hay nada claro en vivo, pero esto empieza pronto:')+'\n'+c.map(function(x){return '[[pick:'+x.f.id+'|'+x.m.n+']]';}).join('\n')+'\nSi tu casa paga menos que la cuota justa, no la juegues.';
+  }
+  var upcoming=DATA.matches.filter(function(f){return liveState(f)==='pre'&&f.ts>now+300&&f.ts<now+36*3600&&okSp(f);});
+  if(/combinad|parlay|combo/.test(t)){
+    var k=/segur|tranqui|2 sel|de 2\b|doble/.test(t)?2:/alta|arriesg|grande|bomba|millon/.test(t)?4:3,nm=t.match(/de (\d)\b/);if(nm)k=Math.max(2,Math.min(6,+nm[1]));
+    var T={2:0.75,3:0.6,4:0.5,5:0.4,6:0.33}[k],need=Math.pow(T,1/k),legs=[];
+    upcoming.forEach(function(f){var best=null;f.markets.forEach(function(m){if(m.p>=need&&m.p<0.97&&comboLegOk(f,m)&&(!best||m.p<best.p))best=m;});if(best)legs.push({f:f,m:best});});
+    legs.sort(function(a,b){return a.m.p-b.m.p;});
+    var want=k;
+    while(legs.length<k&&k>2){k--;T={2:0.75,3:0.6,4:0.5,5:0.4,6:0.33}[k];need=Math.pow(T,1/k);legs=[];
+      upcoming.forEach(function(f){var best=null;f.markets.forEach(function(m){if(m.p>=need&&m.p<0.97&&comboLegOk(f,m)&&(!best||m.p<best.p))best=m;});if(best)legs.push({f:f,m:best});});
+      legs.sort(function(a,b){return a.m.p-b.m.p;});}
+    if(legs.length<k)return 'No me alcanzan los partidos'+(spName?' de '+spName:'')+' de las próximas 36 horas para armar una combinada sólida. Prueba con otro deporte o pídeme lo más seguro'+(spName?' de '+spName:'')+'.';
+    var pick=legs.slice(0,k);
+    return (k<want?'Con los partidos que hay solo sale una sólida de '+k+' (no de '+want+'). ':'')+'Aquí tienes una combinada de '+k+(spName?' de '+spName:'')+' con partidos distintos:\n[[combo:'+pick.map(function(l){return l.f.id+'|'+l.m.n;}).join(';')+']]\nFallar una sola selección pierde toda la combinada.';
+  }
+  if(/segur|mejor|fija|recomiend|hoy|jugada|pronost|que juego|que apuesto/.test(t)||sp){
+    var lo=Math.max(state.th,0.72),best=[];
+    upcoming.forEach(function(f){var b=null;f.markets.forEach(function(m){if(m.p>=lo&&m.p<=0.92&&comboLegOk(f,m)&&(!b||m.p>b.p))b=m;});if(b)best.push({f:f,m:b});});
+    best.sort(function(a,b){return b.m.p-a.m.p;});best=best.slice(0,5);
+    if(!best.length)return 'No encontré jugadas'+(spName?' de '+spName:'')+' que pasen tu umbral de '+pct(lo)+'% en las próximas 36 horas.';
+    return 'Lo más seguro'+(spName?' de '+spName:'')+' que viene (sobre '+pct(lo)+'%):\n'+best.map(function(x){return '[[pick:'+x.f.id+'|'+x.m.n+']]';}).join('\n');
+  }
+  var ex=DATA.matches.filter(function(f){return liveState(f)!=='done'&&f.sport==='futbol';})[0];
+  return 'En modo básico entiendo cosas como:\n- "hazme una combinada de 3 de fútbol"\n- "¿qué le meto ahora en vivo?"\n- "lo más seguro de NBA"\n- el nombre de un equipo'+(ex?', por ejemplo "'+ex.home+'"':'')+'\nCuando la IA esté conectada podrás preguntarme lo que quieras.';
+}
+
+/* --- enviar --- */
+function chStatus(){var el=document.getElementById('chStatus');el.innerHTML=CHAT_API?'<i></i>IA conectada · usa los datos del cerebro':'<i class="off"></i>Modo básico · falta conectar la IA';}
+function chWelcome(){
+  var n=DATA?DATA.matches.filter(function(f){return liveState(f)!=='done';}).length:0,lv=DATA?DATA.matches.filter(function(f){return liveState(f)==='live';}).length:0;
+  chAdd('bot','¡Hola! Soy el cerebro de Umbral. '+(DATA?'Tengo **'+n+' partidos** analizados'+(lv?' y **'+lv+' en vivo**':'')+'.':'')+' Pídeme una combinada, lo más seguro del día o qué meterle ahora en vivo.'+(CHAT_API?'':'\n*Por ahora estoy en modo básico: entiendo órdenes simples.*'));
+}
+function chAsk(text){
+  text=String(text||'').trim();if(!text||CH_BUSY)return;
+  chAdd('user',text);CH_MSGS.push({role:'user',text:text});
+  chIn.value='';chGrow();
+  if(!DATA){chAdd('bot','Todavía estoy cargando los partidos. Prueba en unos segundos.');CH_MSGS.pop();return;}
+  if(!CHAT_API){var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});return;}
+  CH_BUSY=true;chSend.disabled=true;
+  var wait=document.createElement('div');wait.className='ch-m b';wait.innerHTML='<span class="ch-typing" aria-label="Pensando"><i></i><i></i><i></i></span>';chLog.appendChild(wait);chLog.scrollTop=chLog.scrollHeight;
+  var code='';try{code=localStorage.getItem('umbral_acceso')||'';}catch(e){}
+  var ctl=window.AbortController?new AbortController():null,timer=setTimeout(function(){if(ctl)ctl.abort();},60000);
+  fetch(CHAT_API,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({code:code,messages:CH_MSGS.slice(-12),context:chContext(text)})})
+    .then(function(r){return r.json().catch(function(){return {error:'Respuesta rara del servidor ('+r.status+').'};});})
+    .then(function(d){
+      wait.remove();
+      if(d&&d.text){chAdd('bot',d.text);CH_MSGS.push({role:'bot',text:d.text});return;}
+      throw new Error((d&&d.error)||'La IA no respondió.');
+    })
+    .catch(function(e){
+      if(wait.parentNode)wait.remove();
+      var msg=e&&e.name==='AbortError'?'La IA tardó demasiado.':(e&&e.message)||'No me pude conectar con la IA.';
+      chAdd('bot',msg+' Te respondo en modo básico:','err');
+      var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});
+    })
+    .then(function(){clearTimeout(timer);CH_BUSY=false;chSend.disabled=false;});
+}
+function chGrow(){chIn.style.height='auto';chIn.style.height=Math.min(120,chIn.scrollHeight)+'px';}
+function chOpen(){document.body.classList.add('ch-open');chFab.setAttribute('aria-expanded','true');chStatus();if(!chLog.children.length)chWelcome();setTimeout(function(){chIn.focus();},50);}
+function chClose(){document.body.classList.remove('ch-open');chFab.setAttribute('aria-expanded','false');chFab.focus();}
+chFab.addEventListener('click',chOpen);
+document.getElementById('chClose').addEventListener('click',chClose);
+document.getElementById('chClear').addEventListener('click',function(){CH_MSGS=[];CH_COMBOS=[];chLog.innerHTML='';chWelcome();chIn.focus();});
+document.getElementById('chForm').addEventListener('submit',function(e){e.preventDefault();chAsk(chIn.value);});
+chIn.addEventListener('input',chGrow);
+chIn.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();chAsk(chIn.value);}});
+document.getElementById('chQuick').addEventListener('click',function(e){var b=e.target.closest('button');if(b)chAsk(b.textContent);});
+chLog.addEventListener('click',function(e){
+  var c=e.target.closest('[data-chcopy]');
+  if(c){var legs=CH_COMBOS[+c.dataset.chcopy];if(!legs)return;var p=1;legs.forEach(function(l){p*=l.m.p;});
+    var txt='Combinada · cuota justa '+(1/p).toFixed(2)+' ('+pct(p)+'%)\n'+legs.map(function(l){return '• '+l.f.home+' vs '+l.f.away+' ('+chWhen(l.f)+'): '+l.m.n+' — '+pct(l.m.p)+'%';}).join('\n')+'\nUmbral Analytics';
+    var ok=function(){c.textContent='¡Copiada!';setTimeout(function(){c.textContent='Copiar';},1600);};
+    try{navigator.clipboard.writeText(txt).then(ok,function(){window.prompt('Copia la combinada:',txt);});}catch(err){window.prompt('Copia la combinada:',txt);}
+    return;}
+  var b=e.target.closest('[data-id]');if(b&&chMatch(b.dataset.id)){chClose();openDetail(b.dataset.id);}
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.body.classList.contains('ch-open')&&!document.querySelector('.overlay.on'))chClose();});
+// si está abierta tu combinada (abajo a la derecha), el botón del chat se pasa a la izquierda
+var chSlipRender=slipRender;slipRender=function(){chSlipRender();document.body.classList.toggle('slip-on',Object.keys(SLIP).length>0);};
 })();
 </script>
 </body>
