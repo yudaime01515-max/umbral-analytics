@@ -2236,7 +2236,9 @@ function chToken(kind,body){
 }
 function chRender(t){
   var blocks=[];
-  t=String(t||'').replace(/\[\[(pick|combo):([^\]]+)\]\]/g,function(all,k,b){var h=chToken(k,b);if(!h)return '';blocks.push(h);return '\u0001'+(blocks.length-1)+'\u0001';});
+  // la IA a veces escribe fórmulas tipo $0.57 \\times 0.55$: se dejan en texto normal
+  t=String(t||'').replace(/\$([^$\n]+)\$/g,'$1').replace(/\\times/g,'×').replace(/\\cdot/g,'·').replace(/\\approx/g,'≈').replace(/\\%/g,'%').replace(/^\s*---+\s*$/gm,'');
+  t=t.replace(/\[\[(pick|combo):([^\]]+)\]\]/g,function(all,k,b){var h=chToken(k,b);if(!h)return '';blocks.push(h);return '\u0001'+(blocks.length-1)+'\u0001';});
   var html='',inList=false;
   t.split('\n').forEach(function(line){
     var s=line.trim();
