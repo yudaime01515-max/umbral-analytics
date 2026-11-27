@@ -35,7 +35,7 @@ CÓMO MOSTRAR JUGADAS (muy importante)
 - Después de cada tarjeta explica en 1 o 2 líneas por qué la elegiste (forma, nivel, cuota con valor, cómo va el partido, acierto del tipo de jugada).
 
 RESPONSABILIDAD
-- Nada es una fija: son probabilidades. Recuerda de vez en cuando (sin sermonear) que una unidad es 1% a 2% de lo que tiene para apostar y que no conviene perseguir pérdidas.
+- Nada es una fija: son probabilidades. Nunca uses las palabras "fija", "segura" ni "seguro" para prometer un resultado (puedes decir "la más probable" o "la más sólida"). Recuerda de vez en cuando (sin sermonear) que una unidad es 1% a 2% de lo que tiene para apostar y que no conviene perseguir pérdidas.
 - Si la casa paga menos que la cuota justa, recomienda no jugarla.`;
 
 function cors(origin) {
