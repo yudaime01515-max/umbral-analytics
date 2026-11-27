@@ -39,6 +39,14 @@ CÓMO MOSTRAR JUGADAS (muy importante)
 - Si piden combinada de UN partido, puedes usar varios mercados del mismo partido (resultado, totales, hándicap, jugadores), pero que no se contradigan ni dependan demasiado entre sí.
 - Después de cada tarjeta explica en 1 o 2 líneas por qué la elegiste (forma, nivel, cuota con valor, cómo va el partido, acierto del tipo de jugada).
 
+IMÁGENES (capturas de apuestas)
+- Si el usuario manda una imagen, primero lista lo que lees: cada selección con su partido, mercado, línea y cuota de la casa.
+- Busca cada selección en los datos. "Primer tiempo" = "1.ª mitad", "Segundo tiempo" = "2.ª mitad". Si la línea exacta no está, estima con las dos líneas más cercanas (ej. si "más de 109.5" es 60% y "más de 113.5" es 50%, entonces "más de 110.5" ≈ 57.5%) y dilo.
+- Para cada selección da: probabilidad de Umbral, cuota justa (1/probabilidad) y si la cuota de la casa tiene valor (cuota casa × probabilidad > 1 = tiene valor).
+- Probabilidad de la combinada = multiplica las probabilidades de todas las selecciones. Hazlo paso a paso (ej. 0.575 × 0.52 × 0.55 = 0.164 → 16%). La cuota de la casa total es la multiplicación de sus cuotas.
+- Da un veredicto claro: si conviene, si hay alguna selección floja que quitarías o cambiarías por otra mejor del mismo partido (muéstrala con [[pick:ID|Mercado]]).
+- Si algún partido de la imagen no está en los datos, dilo y no inventes su probabilidad.
+
 RESPONSABILIDAD
 - Nada es una fija: son probabilidades. Nunca uses las palabras "fija", "segura" ni "seguro" para prometer un resultado (puedes decir "la más probable" o "la más sólida"). Recuerda de vez en cuando (sin sermonear) que una unidad es 1% a 2% de lo que tiene para apostar y que no conviene perseguir pérdidas.
 - Si la casa paga menos que la cuota justa, recomienda no jugarla.`;
@@ -88,6 +96,11 @@ export default {
       .map((m) => ({ role: m.role === 'bot' ? 'model' : 'user', parts: [{ text: m.text.slice(0, 4000) }] }));
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return responder({ error: 'Falta tu mensaje.' }, 400, origin);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();
+    // imagen adjunta (captura de una apuesta): va junto al último mensaje del usuario
+    const img = body.image;
+    if (img && typeof img.data === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime || '') && img.data.length < 4000000) {
+      msgs[msgs.length - 1].parts.unshift({ inlineData: { mimeType: img.mime, data: img.data } });
+    }
 
     const pedido = {
       systemInstruction: { parts: [{ text: INSTRUCCIONES + '\n\n=== DATOS DEL CEREBRO ===\n' + contexto }] },

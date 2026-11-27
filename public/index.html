@@ -900,6 +900,15 @@ body.ch-open .ch-panel{display:flex}
 .ch-form{display:flex;gap:8px;padding:10px 12px 12px;align-items:flex-end}
 .ch-form textarea{flex:1;resize:none;min-height:44px;max-height:120px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);padding:11px 12px;font-size:15px;line-height:1.4}
 .ch-form textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.ch-att{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.ch-att:hover{color:var(--accent);border-color:var(--accent)}
+.ch-prev{display:none;align-items:center;gap:10px;margin:8px 12px 0;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.ch-prev.on{display:flex}
+.ch-prev img{width:54px;height:54px;object-fit:cover;border-radius:8px}
+.ch-prev span{flex:1;color:var(--muted);font-size:12.5px}
+.ch-prev button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 8px}
+.ch-m.u img{display:block;max-width:100%;max-height:220px;border-radius:10px;margin-bottom:6px}
+.ch-panel.drag{outline:2px dashed var(--accent);outline-offset:-6px}
 .ch-send{flex:none;width:44px;height:44px;border-radius:12px;border:0;background:var(--accent);color:#1A0A05;cursor:pointer;display:grid;place-items:center}
 .ch-send:disabled{opacity:.45;cursor:default}
 body.slip-on .ch-fab{right:auto;left:18px}
@@ -922,9 +931,12 @@ body.slip-on .ch-fab{right:auto;left:18px}
     <button type="button">NBA de hoy</button>
     <button type="button">Combinada de cuota alta</button>
   </div>
+  <div class="ch-prev" id="chPrev"><img id="chPrevImg" alt="Imagen adjunta"><span>Imagen lista. Escribe tu pregunta o envíala así.</span><button type="button" id="chPrevX" aria-label="Quitar imagen">×</button></div>
   <form class="ch-form" id="chForm">
+    <input type="file" id="chFile" accept="image/*" hidden>
+    <button class="ch-att" id="chAtt" type="button" title="Adjuntar captura de tu apuesta" aria-label="Adjuntar imagen"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></button>
     <label for="chIn" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Escribe tu pregunta</label>
-    <textarea id="chIn" rows="1" placeholder="Ej: combinada de 3 con fútbol y NBA"></textarea>
+    <textarea id="chIn" rows="1" placeholder="Escribe o pega una captura (Ctrl+V)"></textarea>
     <button class="ch-send" id="chSend" type="submit" aria-label="Enviar"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </form>
   <div class="ch-foot">Son probabilidades, no fijas. Apuesta solo lo que puedas perder.</div>
@@ -2084,7 +2096,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(drawRuler);
    Pega abajo el enlace de tu Worker (termina en .workers.dev). Si está vacío o la IA no responde,
    el chat sigue funcionando en "modo básico": entiende órdenes simples y arma las jugadas con los mismos datos. */
 var CHAT_API='https://umbral-chat.yudaime01515.workers.dev/';
-var CH_MSGS=[],CH_BUSY=false,CH_COMBOS=[];
+var CH_MSGS=[],CH_BUSY=false,CH_COMBOS=[],CH_IMG=null;
 var chPanel=document.getElementById('chPanel'),chLog=document.getElementById('chLog'),chIn=document.getElementById('chIn'),chFab=document.getElementById('chFab'),chSend=document.getElementById('chSend');
 var CH_TYPES={res:'ganador del partido',tot:'más/menos (totales)',dc:'doble oportunidad',btts:'ambos marcan',hcp:'hándicap',sets_one:'gana al menos un mapa/set',tscore:'equipo marca',st:'tiros/estadísticas'};
 var CH_ES={cs2:1,dota2:1,lol:1,valorant:1,r6:1,ow:1,mlbb:1,sc2:1};
@@ -2103,7 +2115,7 @@ function chSport(f){return (SPORT_BY[f.sport]||{name:f.sport}).name;}
 function chShort(s,n){s=String(s||'');return s.length>n?s.slice(0,n-1)+'…':s;}
 
 /* --- lo que la IA sabe: un resumen compacto de los datos del día --- */
-function chContext(userText){
+function chContext(userText,withImg){
   var now=Date.now()/1000,L=[],th=state.th,txt=chNorm(userText);
   L.push('Ahora en Lima: '+new Date().toLocaleString('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}));
   L.push('Umbral (probabilidad mínima) elegido por el usuario: '+pct(th)+'%');
@@ -2114,7 +2126,8 @@ function chContext(userText){
     Object.keys(CAL.grupos).forEach(function(k){var g=CAL.grupos[k];if(g.n<8)return;var p=k.split('|');
       L.push('- '+((SPORT_BY[p[0]]||{name:p[0]}).name)+' | '+(CH_TYPES[p[1]]||p[1])+': '+Math.round(g.real*100)+'% real vs '+Math.round(g.pred*100)+'% prometido ('+g.ok+'/'+g.n+')');});
   }
-  var keep=DATA.matches.filter(function(f){var st=liveState(f);return st!=='done'&&(st==='live'||f.ts<now+36*3600);});
+  var keep=DATA.matches.filter(function(f){var st=liveState(f);return st!=='done'&&(st==='live'||f.ts<now+(withImg?24:36)*3600);});
+  if(withImg)L.push('\nEl usuario adjuntó una IMAGEN (normalmente su boleto o combinada de una casa de apuestas). Abajo van más mercados por partido, incluidas varias líneas de totales, para que la compares.');
   // partidos que el usuario nombró: siempre entran, con más mercados
   var named={};chNamed(txt).forEach(function(f){named[f.id]=1;});
   DATA.matches.forEach(function(f){if(named[f.id]&&keep.indexOf(f)<0)keep.push(f);});
@@ -2122,9 +2135,17 @@ function chContext(userText){
   L.push('\nPARTIDOS (ID · hora · deporte · liga · partido · estado · mercados con su probabilidad, cuota justa y cuota de la casa si existe):');
   var count=0;
   keep.forEach(function(f){
-    if(count>=(220+Object.keys(named).length))return;
-    var big=!!named[f.id],lim=big?24:6,per={},list=mkOf(f).filter(function(m){return m.p>=(big?0.5:0.58)&&m.p<0.97;}).sort(function(a,b){return b.p-a.p;}),out=[];
-    list.forEach(function(m){if(out.length>=lim)return;var g=mkGroup(f,m.n);per[g]=(per[g]||0)+1;if(per[g]>(big?6:(g==='Jugadores'?3:2)))return;
+    if(count>=((withImg?130:220)+Object.keys(named).length))return;
+    var big=!!named[f.id]||withImg,lim=named[f.id]?24:6,per={},out=[];
+    var list=mkOf(f).filter(function(m){return m.p>=(withImg?0.3:big?0.5:0.58)&&m.p<0.97;}).sort(function(a,b){return b.p-a.p;});
+    if(withImg){
+      // con imagen: primero resultado, totales y mitades (todas sus líneas, para poder comparar con la casa); los jugadores al final
+      var ORD={'Partido':0,'Resultado y goles':0,'Mitades':1,'Equipos':2,'Cuartos':3,'Córners':4,'Tarjetas':5,'Todos':0,'Jugadores':9};
+      lim=f.sport==='basquet'?48:18;
+      list.sort(function(a,b){var ga=ORD[mkGroup(f,a.n)],gb=ORD[mkGroup(f,b.n)];return ((ga==null?6:ga)-(gb==null?6:gb))||(b.p-a.p);});
+      list.forEach(function(m){if(out.length>=lim)return;var g=mkGroup(f,m.n);per[g]=(per[g]||0)+1;if(per[g]>(g==='Jugadores'?6:16))return;
+        out.push(m.n+' '+pct(m.p)+'%'+(m.q?' (casa '+(+m.q).toFixed(2)+')':''));});
+    }else list.forEach(function(m){if(out.length>=lim)return;var g=mkGroup(f,m.n);per[g]=(per[g]||0)+1;if(per[g]>(big?6:(g==='Jugadores'?3:2)))return;
       out.push(m.n+' '+pct(m.p)+'% (justa '+fair(m.p)+(m.q?', casa '+(+m.q).toFixed(2):'')+')');});
     if(!out.length)return;
     count++;
@@ -2292,16 +2313,20 @@ function chWelcome(){
   chAdd('bot','¡Hola! Soy el cerebro de Umbral. '+(DATA?'Tengo **'+n+' partidos** analizados'+(lv?' y **'+lv+' en vivo**':'')+'.':'')+' Pídeme una combinada, lo más seguro del día o qué meterle ahora en vivo.'+(CHAT_API?'':'\n*Por ahora estoy en modo básico: entiendo órdenes simples.*'));
 }
 function chAsk(text){
-  text=String(text||'').trim();if(!text||CH_BUSY)return;
-  chAdd('user',text);CH_MSGS.push({role:'user',text:text});
-  chIn.value='';chGrow();
+  text=String(text||'').trim();var img=CH_IMG;
+  if((!text&&!img)||CH_BUSY)return;
+  if(!text)text='¿Qué opinas de esta apuesta? ¿Qué probabilidad tiene de salir?';
+  var ub=chAdd('user',text);if(img){var im=document.createElement('img');im.src=img.url;im.alt='Imagen adjunta';ub.insertBefore(im,ub.firstChild);}
+  CH_MSGS.push({role:'user',text:img?'[Adjunté una imagen] '+text:text});
+  chIn.value='';chGrow();chImgClear();
+  if(img&&!CHAT_API){chAdd('bot','Para leer imágenes necesito la IA conectada. Por ahora escríbeme los equipos y el mercado, por ejemplo "Knicks más de 110.5 puntos primer tiempo".');return;}
   if(!DATA){chAdd('bot','Todavía estoy cargando los partidos. Prueba en unos segundos.');CH_MSGS.pop();return;}
   if(!CHAT_API){var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});return;}
   CH_BUSY=true;chSend.disabled=true;
   var wait=document.createElement('div');wait.className='ch-m b';wait.innerHTML='<span class="ch-typing" aria-label="Pensando"><i></i><i></i><i></i></span>';chLog.appendChild(wait);chLog.scrollTop=chLog.scrollHeight;
   var code='';try{code=localStorage.getItem('umbral_acceso')||'';}catch(e){}
   var ctl=window.AbortController?new AbortController():null,timer=setTimeout(function(){if(ctl)ctl.abort();},60000);
-  fetch(CHAT_API,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({code:code,messages:CH_MSGS.slice(-12),context:chContext(text)})})
+  fetch(CHAT_API,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify({code:code,messages:CH_MSGS.slice(-12),context:chContext(text,!!img),image:img?{mime:img.mime,data:img.data}:undefined})})
     .then(function(r){return r.json().catch(function(){return {error:'Respuesta rara del servidor ('+r.status+').'};});})
     .then(function(d){
       wait.remove();
@@ -2312,6 +2337,7 @@ function chAsk(text){
       if(wait.parentNode)wait.remove();
       var msg=e&&e.name==='AbortError'?'La IA tardó demasiado.':(e&&e.message)||'No me pude conectar con la IA.';
       chAdd('bot',msg+' Te respondo en modo básico:','err');
+      if(img){chAdd('bot','Sin la IA no puedo leer la imagen. Escríbeme los equipos y el mercado y te digo su probabilidad.');return;}
       var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});
     })
     .then(function(){clearTimeout(timer);CH_BUSY=false;chSend.disabled=false;});
@@ -2323,6 +2349,28 @@ chFab.addEventListener('click',chOpen);
 document.getElementById('chClose').addEventListener('click',chClose);
 document.getElementById('chClear').addEventListener('click',function(){CH_MSGS=[];CH_COMBOS=[];chLog.innerHTML='';chWelcome();chIn.focus();});
 document.getElementById('chForm').addEventListener('submit',function(e){e.preventDefault();chAsk(chIn.value);});
+/* --- imágenes: pegar (Ctrl+V), adjuntar o arrastrar; se achican a 1400 px para que viajen rápido --- */
+function chImgClear(){CH_IMG=null;document.getElementById('chPrev').classList.remove('on');document.getElementById('chFile').value='';}
+function chImgLoad(file){
+  if(!file||!/^image\//.test(file.type))return;
+  var url=URL.createObjectURL(file),im=new Image();
+  im.onload=function(){
+    var k=Math.min(1,1400/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+    var g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+    var du=c.toDataURL('image/jpeg',0.85);
+    CH_IMG={mime:'image/jpeg',data:du.split(',')[1],url:du};URL.revokeObjectURL(url);
+    document.getElementById('chPrevImg').src=du;document.getElementById('chPrev').classList.add('on');chIn.focus();
+  };
+  im.onerror=function(){URL.revokeObjectURL(url);};
+  im.src=url;
+}
+document.getElementById('chAtt').addEventListener('click',function(){document.getElementById('chFile').click();});
+document.getElementById('chFile').addEventListener('change',function(e){chImgLoad(e.target.files&&e.target.files[0]);});
+document.getElementById('chPrevX').addEventListener('click',chImgClear);
+chIn.addEventListener('paste',function(e){var it=(e.clipboardData&&e.clipboardData.items)||[];for(var i=0;i<it.length;i++){if(it[i].kind==='file'&&/^image\//.test(it[i].type)){e.preventDefault();chImgLoad(it[i].getAsFile());return;}}});
+chPanel.addEventListener('dragover',function(e){if(e.dataTransfer&&Array.prototype.indexOf.call(e.dataTransfer.types||[],'Files')>=0){e.preventDefault();chPanel.classList.add('drag');}});
+chPanel.addEventListener('dragleave',function(e){if(e.target===chPanel)chPanel.classList.remove('drag');});
+chPanel.addEventListener('drop',function(e){chPanel.classList.remove('drag');var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f&&/^image\//.test(f.type)){e.preventDefault();chImgLoad(f);}});
 chIn.addEventListener('input',chGrow);
 chIn.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();chAsk(chIn.value);}});
 document.getElementById('chQuick').addEventListener('click',function(e){var b=e.target.closest('button');if(b)chAsk(b.textContent);});
