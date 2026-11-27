@@ -893,6 +893,16 @@ body.ch-open .ch-panel{display:flex}
 .ch-combo .lg .t{color:var(--muted);font-size:12px}
 .ch-combo .f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
 .ch-combo .f button{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;color:var(--text);cursor:pointer;font-size:12px}
+.ch-slip{margin:8px 0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ch-slip .h{display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px 6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.ch-slip .r{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:8px 12px;color:var(--text);cursor:pointer}
+.ch-slip .r:disabled{cursor:default;opacity:.75}
+.ch-slip .r .m{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:14px}
+.ch-slip .r .t{color:var(--muted);font-size:12px}
+.ch-slip .ok{color:var(--good)}.ch-slip .no{color:var(--bad)}
+.ch-slip .f{border-top:1px solid var(--line);padding:10px 12px;font-size:13px;display:grid;gap:4px}
+.ch-slip .f b{font-variant-numeric:tabular-nums}
+.ch-slip .v{font-weight:700}
 .ch-quick{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;scrollbar-width:none}
 .ch-quick::-webkit-scrollbar{display:none}
 .ch-quick button{flex:none;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--text);cursor:pointer;white-space:nowrap}
@@ -2213,6 +2223,58 @@ function chTargetCombo(text){
   var p=1;legs.forEach(function(l){p*=l.m.p;});
   return {target:target,p:p,single:single,legs:legs,token:'[[combo:'+legs.map(function(l){return l.f.id+'|'+l.m.n;}).join(';')+']]'};
 }
+/* --- boleto en imagen: la IA solo lo lee; aquí se busca cada selección en Umbral y se hacen las cuentas --- */
+function chNum(x){var m=String(x).match(/\d+(?:[.,]\d+)?/g);return m?parseFloat(m[m.length-1].replace(',','.')):NaN;}
+function chFindMatch(a,b){
+  var wa=chNorm(a).split(/[^a-z0-9]+/).filter(function(w){return w.length>=3&&!CH_STOP[w];}),wb=chNorm(b).split(/[^a-z0-9]+/).filter(function(w){return w.length>=3&&!CH_STOP[w];});
+  var sc=function(name,ws){var n=chNorm(name);return ws.filter(function(w){return n.indexOf(w)>=0;}).length;};
+  var best=null,bs=0,now=Date.now()/1000;
+  DATA.matches.forEach(function(f){if(liveState(f)==='done'||f.ts>now+3*86400)return;
+    // si la imagen trae los dos equipos, tienen que coincidir los dos (así "Real Madrid vs Barcelona" no cae en "Real Madrid vs Alavés")
+    var h1=sc(f.home,wa),a1=sc(f.away,wb),h2=sc(f.home,wb),a2=sc(f.away,wa),both=wa.length&&wb.length;
+    var v=both?Math.max(h1&&a1?h1+a1:0,h2&&a2?h2+a2:0):Math.max(h1+a1,h2+a2);if(v>bs){bs=v;best=f;}});
+  return best;
+}
+function chSlipLeg(sel){
+  var out={sel:sel,cuota:parseFloat(sel.cuota)||0};
+  var f=chFindMatch(sel.local||'',sel.visitante||'');if(!f)return out;out.f=f;
+  var name=String(sel.mercado||'');
+  // cambia el nombre del equipo de la casa por el de Umbral ("LA Lakers" → "Los Angeles Lakers")
+  var ov=function(a,b){var wb=chNorm(b);return chNorm(a).split(/[^a-z0-9]+/).filter(function(w){return w.length>=3&&wb.indexOf(w)>=0;}).length;};
+  [sel.local,sel.visitante].forEach(function(nm){if(!nm)return;nm=String(nm);if(name.indexOf(nm)<0)return;var tgt=ov(nm,f.home)>=ov(nm,f.away)?f.home:f.away;name=name.split(nm).join(tgt);});
+  var all=mkOf(f),n=chNorm(name).trim(),i;
+  for(i=0;i<all.length;i++)if(chNorm(all[i].n).trim()===n){out.m=all[i];out.p=all[i].p;out.exact=true;return out;}
+  // línea que Umbral no tiene exacta: se estima entre las dos líneas más cercanas del mismo mercado
+  var tpl=function(x){return chNorm(x).replace(/\d+(?:[.,]\d+)?/g,'#').trim();},T=tpl(name),L=chNum(name);if(isNaN(L))return out;
+  var fam=all.filter(function(m){return tpl(m.n)===T;}).map(function(m){return {l:chNum(m.n),p:m.p,m:m};}).filter(function(x){return !isNaN(x.l);}).sort(function(a,b){return a.l-b.l;});
+  if(!fam.length)return out;
+  var lo=null,hi=null;fam.forEach(function(x){if(x.l<=L)lo=x;if(x.l>=L&&!hi)hi=x;});
+  if(lo&&hi){out.p=lo.l===hi.l?lo.p:lo.p+(hi.p-lo.p)*(L-lo.l)/(hi.l-lo.l);out.m=Math.abs(L-lo.l)<=Math.abs(hi.l-L)?lo.m:hi.m;out.near=lo.l===hi.l?null:[lo.l,hi.l];}
+  else{var e=lo||hi;out.p=e.p;out.m=e.m;out.far=e.l;}
+  out.name=name;return out;
+}
+function chSlip(data){
+  var legs=(data.selecciones||[]).map(chSlipLeg),found=legs.filter(function(l){return l.p!=null;}),p=1,casa=1,allQ=true;
+  found.forEach(function(l){p*=l.p;});legs.forEach(function(l){if(l.cuota>1)casa*=l.cuota;else allQ=false;});
+  if(data.cuota_total&&+data.cuota_total>1)casa=+data.cuota_total;
+  return {legs:legs,found:found,p:p,casa:allQ||data.cuota_total?casa:0,missing:legs.length-found.length};
+}
+function chSlipHTML(S){
+  var h='<div class="ch-slip"><div class="h"><span>Tu boleto · '+S.legs.length+' selecciones</span><span>Umbral · casa</span></div>';
+  S.legs.forEach(function(l){var sel=l.sel,mk=l.m?l.m.n:(sel.mercado||sel.texto||'?'),txt=l.f?(l.f.home+' vs '+l.f.away):((sel.local||'')+' vs '+(sel.visitante||''));
+    var val=l.p!=null&&l.cuota>1?(l.cuota*l.p>=1?'<span class="ok">✓ paga bien</span>':'<span class="no">✗ paga poco</span>'):'';
+    h+='<button class="r" type="button"'+(l.f?' data-id="'+esc(l.f.id)+'"':' disabled')+'><span class="m"><span>'+esc(l.name&&!l.exact?(sel.mercado||mk):mk)+'</span><span>'+(l.p!=null?pct(l.p)+'%':'—')+(l.cuota>1?' · '+l.cuota.toFixed(2):'')+'</span></span>'+
+      '<span class="t">'+esc(txt)+(l.p!=null?' · justa '+fair(l.p):'')+(l.near?' · estimada entre '+l.near[0]+' y '+l.near[1]:'')+(l.far!=null?' · aprox. (Umbral solo tiene la línea '+l.far+')':'')+(l.p==null?(l.f?' · Umbral no tiene este mercado':' · este partido no está en Umbral'):'')+(val?' · '+val:'')+'</span></button>';});
+  var fair_=S.found.length?1/S.p:0;
+  h+='<div class="f">'+(S.found.length?'<div>Probabilidad de acertar '+(S.missing?'las '+S.found.length+' que conozco':'todas')+': <b>'+pct(S.p)+'%</b> · cuota justa <b>'+fair_.toFixed(2)+'</b></div>':'<div>No encontré estas selecciones en Umbral.</div>')+
+    (S.casa&&S.found.length&&!S.missing?'<div>La casa paga <b>'+S.casa.toFixed(2)+'</b> → <span class="v '+(S.casa>=fair_?'ok':'no')+'">'+(S.casa>=fair_*1.02?'tiene valor':S.casa>=fair_*0.95?'casi lo justo':'paga menos de lo que debería')+'</span></div>':'')+
+    (S.missing?'<div style="color:var(--muted)">'+S.missing+' selección(es) no están en Umbral: no entran en el cálculo.</div>':'')+'</div></div>';
+  return h;
+}
+function chSlipText(S){
+  return 'ANÁLISIS DEL BOLETO (calculado por la página con los datos de Umbral, ya mostrado al usuario en una tabla):\n'+S.legs.map(function(l,i){var sel=l.sel;return (i+1)+'. '+(sel.mercado||sel.texto)+' — '+(l.f?l.f.home+' vs '+l.f.away+' ['+l.f.id+']':'partido no encontrado')+' — '+(l.p!=null?'Umbral '+pct(l.p)+'% (justa '+fair(l.p)+')'+(l.near?' estimada entre las líneas '+l.near.join(' y '):'')+(l.far!=null?' aprox. con la línea '+l.far:''):'sin dato en Umbral')+(l.cuota>1?' · casa '+l.cuota.toFixed(2):'');}).join('\n')+
+    '\nTOTAL: probabilidad de acertar '+(S.missing?'las que conozco':'todas')+' '+pct(S.p)+'% · cuota justa '+(1/S.p).toFixed(2)+(S.casa?' · la casa paga '+S.casa.toFixed(2):'');
+}
 function chNow(){var s=state.sport;state.sport='all';var r=[];try{r=nowCands();}catch(e){}state.sport=s;return r;}
 
 /* --- dibujar tarjetas de jugadas y combinadas --- */
@@ -2325,6 +2387,7 @@ function chAsk(text){
   if(!DATA){chAdd('bot','Todavía estoy cargando los partidos. Prueba en unos segundos.');CH_MSGS.pop();return;}
   if(!CHAT_API){var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});return;}
   CH_BUSY=true;chSend.disabled=true;
+  if(img){chAskImg(text,img);return;}
   var wait=document.createElement('div');wait.className='ch-m b';wait.innerHTML='<span class="ch-typing" aria-label="Pensando"><i></i><i></i><i></i></span>';chLog.appendChild(wait);chLog.scrollTop=chLog.scrollHeight;
   var code='';try{code=localStorage.getItem('umbral_acceso')||'';}catch(e){}
   var ctl=window.AbortController?new AbortController():null,timer=setTimeout(function(){if(ctl)ctl.abort();},60000);
@@ -2343,6 +2406,28 @@ function chAsk(text){
       var r=chLocal(text);chAdd('bot',r);CH_MSGS.push({role:'bot',text:r});
     })
     .then(function(){clearTimeout(timer);CH_BUSY=false;chSend.disabled=false;});
+}
+function chAskImg(text,img){
+  var wait=document.createElement('div');wait.className='ch-m b';wait.innerHTML='<span class="ch-typing" aria-label="Leyendo"><i></i><i></i><i></i></span> <span style="color:var(--muted);font-size:13px">Leyendo tu boleto…</span>';chLog.appendChild(wait);chLog.scrollTop=chLog.scrollHeight;
+  var code='';try{code=localStorage.getItem('umbral_acceso')||'';}catch(e){}
+  var post=function(body,ms){var ctl=window.AbortController?new AbortController():null,tm=setTimeout(function(){if(ctl)ctl.abort();},ms);
+    return fetch(CHAT_API,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl?ctl.signal:undefined,body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return {error:'Respuesta rara del servidor ('+r.status+').'};});}).then(function(d){clearTimeout(tm);return d;},function(e){clearTimeout(tm);throw e;});};
+  var done=function(){CH_BUSY=false;chSend.disabled=false;};
+  post({code:code,mode:'leer',image:{mime:img.mime,data:img.data},messages:[{role:'user',text:'leer'}]},45000).then(function(d){
+    if(!d||!d.selecciones){throw new Error((d&&d.error)||'No pude leer la imagen.');}
+    if(!d.selecciones.length){wait.remove();chAdd('bot','No encontré selecciones de apuesta en esa imagen. Prueba con una captura donde se vean los equipos, el mercado y la cuota.');done();return;}
+    var S=chSlip(d),box=document.createElement('div');box.className='ch-m b';box.innerHTML=chSlipHTML(S);wait.replaceWith(box);chLog.scrollTop=chLog.scrollHeight;
+    var summary=chSlipText(S);CH_MSGS.push({role:'bot',text:summary});
+    var names=S.legs.map(function(l){return l.f?l.f.home+' '+l.f.away:'';}).join(' ');
+    var w2=document.createElement('div');w2.className='ch-m b';w2.innerHTML='<span class="ch-typing" aria-label="Pensando"><i></i><i></i><i></i></span>';chLog.appendChild(w2);chLog.scrollTop=chLog.scrollHeight;
+    var msgs=CH_MSGS.slice(-12).concat([{role:'user',text:'Dame tu opinión de mi boleto en pocas líneas: '+text}]);
+    return post({code:code,messages:msgs,context:summary+'\n\n'+chContext(text+' '+names,false)},45000).then(function(r){
+      w2.remove();if(r&&r.text){chAdd('bot',r.text);CH_MSGS.push({role:'bot',text:r.text});}
+    },function(){w2.remove();});
+  }).catch(function(e){
+    if(wait.parentNode)wait.remove();
+    chAdd('bot',(e&&e.name==='AbortError'?'La IA tardó demasiado leyendo la imagen.':(e&&e.message)||'No pude leer la imagen.')+' Prueba otra vez o escríbeme los equipos y el mercado.','err');
+  }).then(done);
 }
 function chGrow(){chIn.style.height='auto';chIn.style.height=Math.min(120,chIn.scrollHeight)+'px';}
 function chOpen(){document.body.classList.add('ch-open');chFab.setAttribute('aria-expanded','true');chStatus();if(!chLog.children.length)chWelcome();setTimeout(function(){chIn.focus();},50);}

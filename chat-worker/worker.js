@@ -40,6 +40,7 @@ CÓMO MOSTRAR JUGADAS (muy importante)
 - Después de cada tarjeta explica en 1 o 2 líneas por qué la elegiste (forma, nivel, cuota con valor, cómo va el partido, acierto del tipo de jugada).
 
 IMÁGENES (capturas de apuestas)
+- Si en los datos aparece "ANÁLISIS DEL BOLETO (calculado por la página)", esas probabilidades y la probabilidad total YA están bien calculadas con los datos de Umbral: úsalas tal cual, NO las recalcules ni las cambies. La página ya le muestra al usuario la tabla; tú explica en pocas líneas qué selección es la más floja y por qué, si la cuota de la casa tiene valor y qué cambiarías (con [[pick:ID|Mercado]] si propones otra).
 - Si el usuario manda una imagen, primero lista lo que lees: cada selección con su partido, mercado, línea y cuota de la casa.
 - Busca cada selección en los datos. "Primer tiempo" = "1.ª mitad", "Segundo tiempo" = "2.ª mitad". Si la línea exacta no está, estima con las dos líneas más cercanas (ej. si "más de 109.5" es 60% y "más de 113.5" es 50%, entonces "más de 110.5" ≈ 57.5%) y dilo.
 - Para cada selección da: probabilidad de Umbral, cuota justa (1/probabilidad) y si la cuota de la casa tiene valor (cuota casa × probabilidad > 1 = tiene valor).
@@ -50,6 +51,22 @@ IMÁGENES (capturas de apuestas)
 RESPONSABILIDAD
 - Nada es una fija: son probabilidades. Nunca uses las palabras "fija", "segura" ni "seguro" para prometer un resultado (puedes decir "la más probable" o "la más sólida"). Recuerda de vez en cuando (sin sermonear) que una unidad es 1% a 2% de lo que tiene para apostar y que no conviene perseguir pérdidas.
 - Si la casa paga menos que la cuota justa, recomienda no jugarla.`;
+
+const LEER_IMAGEN = `Lees capturas de boletos o combinadas de casas de apuestas (Betano, Te Apuesto, Inkabet, Bet365, etc.).
+Devuelve SOLO un JSON con esta forma:
+{"selecciones":[{"local":"equipo local completo","visitante":"equipo visitante completo","mercado":"nombre en formato Umbral","cuota":1.47,"texto":"lo que dice la imagen"}],"cuota_total":3.88}
+
+Escribe "mercado" con estos formatos EXACTOS de Umbral (usa el nombre completo del equipo o jugador tal como sale en la imagen):
+- Ganador: "Gana {Equipo}" · "Empate"
+- Total del partido: "Más de {L} puntos" / "Menos de {L} puntos" (básquet) · "Más de {L} goles" / "Menos de {L} goles" (fútbol)
+- Total de UN equipo (cuando dice "Total de puntos {Equipo}" o "{Equipo} total"): "{Equipo}: más de {L} puntos" / "{Equipo}: menos de {L} puntos"
+- Medio tiempo / primer tiempo / 1.ª mitad: "1.ª mitad: más de {L} puntos" · "1.ª mitad: gana {Equipo}" · segundo tiempo: "2.ª mitad: ..."
+- Cuartos: "1.er cuarto: más de {L} puntos" · "2.º cuarto: ..." · "3.er cuarto: ..." · "4.º cuarto: ..."
+- Hándicap: "{Equipo} -4.5" · "{Equipo} +4.5"
+- Fútbol: "Ambos marcan: sí" · "Ambos marcan: no" · "Doble oportunidad: {Equipo} o empate" · "Doble oportunidad: no hay empate" · "Más de {L} córners" · "Más de {L} tarjetas amarillas"
+- Jugador: "{Jugador}: más de {L} puntos" (o rebotes, asistencias, triples)
+- Esports: "Gana {Equipo}" · "{Equipo} gana al menos un mapa" · "Más de {L} mapas"
+Si no estás seguro de un dato, igual ponlo como mejor lo entiendas. No inventes selecciones que no estén en la imagen. cuota_total es la cuota total que muestra la imagen (o null).`;
 
 function cors(origin) {
   const ok = ORIGENES.includes(origin) ? origin : ORIGENES[0];
@@ -77,6 +94,40 @@ async function codigoValido(h) {
   return (d.codigos || []).some((c) => c.h === h);
 }
 
+// Pregunta a Gemini probando los modelos en orden; devuelve {text, model} o {err, status}
+async function preguntar(env, pedido) {
+  const modelos = [env.MODEL, ...MODELOS].filter((m, i, a) => m && a.indexOf(m) === i);
+  let ultimo = '';
+  for (const modelo of modelos) {
+    let r;
+    try {
+      r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+        body: JSON.stringify(pedido),
+        signal: AbortSignal.timeout(ESPERA_MS),
+      });
+    } catch (e) {
+      ultimo = modelo + ' tardó demasiado';
+      continue;
+    }
+    if (r.ok) {
+      const d = await r.json();
+      const c = d.candidates && d.candidates[0];
+      const texto = c && c.content && (c.content.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
+      if (texto) return { text: texto, model: modelo };
+      ultimo = 'La IA no devolvió texto (' + ((c && c.finishReason) || 'sin motivo') + ').';
+      continue;
+    }
+    ultimo = r.status + ' ' + (await r.text()).slice(0, 300);
+    // 404: el modelo no existe para esta clave · 429: se acabó el límite gratis de ese modelo · 5xx: Google ocupado
+    if (r.status === 404 || r.status === 429 || r.status >= 500) continue;
+    if (r.status === 400 || r.status === 403) return { status: 502, err: { error: 'Google rechazó el pedido. Revisa tu clave GEMINI_API_KEY.', detalle: ultimo } };
+  }
+  const limite = /429|RESOURCE_EXHAUSTED/.test(ultimo);
+  return { status: limite ? 429 : 502, err: { error: limite ? 'Se acabó el límite gratis de la IA por ahora. Prueba en un rato.' : 'La IA no respondió.', detalle: ultimo, limite } };
+}
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get('Origin') || '';
@@ -90,6 +141,24 @@ export default {
     try { body = await req.json(); } catch (e) { return responder({ error: 'Pedido inválido' }, 400, origin); }
     if (!(await codigoValido(body.code))) return responder({ error: 'Tu código de acceso ya no es válido.' }, 401, origin);
 
+    const img = body.image;
+    const imgOk = img && typeof img.data === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime || '') && img.data.length < 4000000;
+
+    // Paso 1 con imagen: la IA solo LEE el boleto; las cuentas las hace la página con los datos de Umbral
+    if (body.mode === 'leer') {
+      if (!imgOk) return responder({ error: 'Falta la imagen.' }, 400, origin);
+      const res = await preguntar(env, {
+        systemInstruction: { parts: [{ text: LEER_IMAGEN }] },
+        contents: [{ role: 'user', parts: [{ inlineData: { mimeType: img.mime, data: img.data } }, { text: 'Lee esta imagen y devuelve el JSON.' }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 2048, responseMimeType: 'application/json' },
+      });
+      if (!res.text) return responder(res.err, res.status, origin);
+      let out = null;
+      try { out = JSON.parse(res.text.replace(/^```(?:json)?|```$/g, '').trim()); } catch (e) { out = null; }
+      if (!out || !Array.isArray(out.selecciones)) return responder({ error: 'No pude leer las selecciones de la imagen.' }, 422, origin);
+      return responder({ selecciones: out.selecciones.slice(0, 20), cuota_total: out.cuota_total || null, model: res.model }, 200, origin);
+    }
+
     const contexto = String(body.context || '').slice(0, 240000);
     const msgs = (Array.isArray(body.messages) ? body.messages : []).slice(-12)
       .filter((m) => m && typeof m.text === 'string' && m.text.trim())
@@ -97,8 +166,7 @@ export default {
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return responder({ error: 'Falta tu mensaje.' }, 400, origin);
     while (msgs.length && msgs[0].role !== 'user') msgs.shift();
     // imagen adjunta (captura de una apuesta): va junto al último mensaje del usuario
-    const img = body.image;
-    if (img && typeof img.data === 'string' && /^image\/(jpeg|png|webp)$/.test(img.mime || '') && img.data.length < 4000000) {
+    if (imgOk) {
       msgs[msgs.length - 1].parts.unshift({ inlineData: { mimeType: img.mime, data: img.data } });
     }
 
@@ -108,35 +176,8 @@ export default {
       generationConfig: { temperature: 0.5, maxOutputTokens: 4096 },
     };
 
-    const modelos = [env.MODEL, ...MODELOS].filter((m, i, a) => m && a.indexOf(m) === i);
-    let ultimo = '';
-    for (const modelo of modelos) {
-      let r;
-      try {
-        r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-          body: JSON.stringify(pedido),
-          signal: AbortSignal.timeout(ESPERA_MS),
-        });
-      } catch (e) {
-        ultimo = modelo + ' tardó demasiado';
-        continue;
-      }
-      if (r.ok) {
-        const d = await r.json();
-        const c = d.candidates && d.candidates[0];
-        const texto = c && c.content && (c.content.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join('');
-        if (texto) return responder({ text: texto, model: modelo }, 200, origin);
-        ultimo = 'La IA no devolvió texto (' + ((c && c.finishReason) || 'sin motivo') + ').';
-        continue;
-      }
-      ultimo = r.status + ' ' + (await r.text()).slice(0, 300);
-      // 404: el modelo no existe para esta clave · 429: se acabó el límite gratis de ese modelo · 5xx: Google ocupado
-      if (r.status === 404 || r.status === 429 || r.status >= 500) continue;
-      if (r.status === 400 || r.status === 403) return responder({ error: 'Google rechazó el pedido. Revisa tu clave GEMINI_API_KEY.', detalle: ultimo }, 502, origin);
-    }
-    const limite = /429|RESOURCE_EXHAUSTED/.test(ultimo);
-    return responder({ error: limite ? 'Se acabó el límite gratis de la IA por ahora. Prueba en un rato.' : 'La IA no respondió.', detalle: ultimo, limite }, limite ? 429 : 502, origin);
+    const res = await preguntar(env, pedido);
+    if (res.text) return responder({ text: res.text, model: res.model }, 200, origin);
+    return responder(res.err, res.status, origin);
   },
 };
