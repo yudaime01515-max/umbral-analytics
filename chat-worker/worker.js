@@ -12,7 +12,9 @@
 
 const ORIGENES = ['https://yudaime01515-max.github.io', 'http://localhost:8000', 'http://127.0.0.1:8000'];
 const ACCESO_URL = 'https://raw.githubusercontent.com/yudaime01515-max/umbral-analytics/main/public/data/acceso.json';
-const MODELOS = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'];
+// Primero los Flash-Lite: son los que el plan gratis deja usar sin trabas y responden rápido.
+const MODELOS = ['gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const ESPERA_MS = 20000; // si un modelo tarda más de 20 s, se pasa al siguiente
 
 const INSTRUCCIONES = `Eres "Umbral", el asistente de Umbral Analytics, una web privada de pronósticos deportivos.
 Hablas en español de Perú, cercano y directo, como un amigo que sabe de apuestas y de estadística. Respuestas cortas y claras.
@@ -93,11 +95,18 @@ export default {
     const modelos = [env.MODEL, ...MODELOS].filter((m, i, a) => m && a.indexOf(m) === i);
     let ultimo = '';
     for (const modelo of modelos) {
-      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify(pedido),
-      });
+      let r;
+      try {
+        r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+          body: JSON.stringify(pedido),
+          signal: AbortSignal.timeout(ESPERA_MS),
+        });
+      } catch (e) {
+        ultimo = modelo + ' tardó demasiado';
+        continue;
+      }
       if (r.ok) {
         const d = await r.json();
         const c = d.candidates && d.candidates[0];
