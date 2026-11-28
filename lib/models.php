@@ -89,6 +89,17 @@ function model_match(array $sport, array $R, array $m): ?array
     $la = $R['avgA'] * $ta['att'] * $th['def'];
     $H = $m['home']; $A = $m['away'];
 
+    // NBA: si faltan jugadores que anotan, el equipo anota menos (ver lib/bajas.php)
+    $bj = !empty($sport['players']) && $sport['model'] === 'normal' ? ($GLOBALS['NBA_BAJAS']['teams'] ?? []) : [];
+    $bH = $bj[(string)$m['home_id']] ?? null; $bA = $bj[(string)$m['away_id']] ?? null;
+    if ($bH || $bA) {
+        $lh -= $bH['pts'] ?? 0; $la -= $bA['pts'] ?? 0;
+        $res = model_normal($lh, $la, $H, $A, $sport);
+        if ($bH) $res['exp'][] = nba_bajas_exp($H, $bH);
+        if ($bA) $res['exp'][] = nba_bajas_exp($A, $bA);
+        return $res;
+    }
+
     switch ($sport['model']) {
         case 'poisson_draw': return model_football($lh, $la, $H, $A);
         case 'poisson_ot':   return model_poisson_ot($lh, $la, $H, $A, $sport);

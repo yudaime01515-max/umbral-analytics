@@ -9,6 +9,7 @@ $cfg = require "$root/config.php";
 require "$root/lib/api.php";
 require "$root/lib/models.php";
 require "$root/lib/espn.php";
+require "$root/lib/bajas.php";
 require "$root/lib/espn_futbol.php";
 require "$root/lib/tenis.php";
 require "$root/lib/espn_ligas.php";
@@ -58,6 +59,12 @@ foreach ($history as $i => $h) $histIdx[$h['id']] = $i;
 $CAL = aprender_calibracion($history);
 // Cerebro: modelo que se reentrena con todos los pronósticos cerrados y se examina solo una vez al día
 $CEREBRO = cerebro_aprender($history, "$dataDir/cerebro.json", $now);
+// Bajas NBA: el reporte oficial de lesiones ajusta los puntos de cada equipo y las líneas de sus jugadores
+$GLOBALS['NBA_BAJAS'] = ['teams' => [], 'skip' => [], 'boost' => []];
+if (is_file("$dataDir/nba.json") && !getenv('UMBRAL_SIN_BAJAS')) {
+    try { $GLOBALS['NBA_BAJAS'] = nba_bajas(json_decode(file_get_contents("$dataDir/nba.json"), true) ?: [], $now); }
+    catch (Throwable $e) { log_line('ERROR bajas NBA: ' . $e->getMessage()); }
+}
 file_put_contents("$dataDir/cerebro.json", json_encode($CEREBRO, JSON_UNESCAPED_UNICODE));
 $CAL['w'] = $CEREBRO['activo'] ? $CEREBRO['w'] : null;
 

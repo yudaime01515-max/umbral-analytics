@@ -256,6 +256,7 @@ function nba_players_update(array $cfg, array $events, string $dataDir): void
 function nba_props(array $m, array $db): array
 {
     $players = $db['players'] ?? []; $out = [];
+    $skip = $GLOBALS['NBA_BAJAS']['skip'] ?? []; $boost = $GLOBALS['NBA_BAJAS']['boost'] ?? [];
     $stats = [['puntos', fn($g) => $g[4]], ['rebotes', fn($g) => $g[5]], ['asistencias', fn($g) => $g[6]],
               ['triples', fn($g) => $g[7]], ['tiros libres', fn($g) => $g[10] ?? null], ['PTS+REB+AST', fn($g) => $g[4] + $g[5] + $g[6]]];
     foreach ([(string)($m['hid'] ?? ''), (string)($m['aid'] ?? '')] as $tid) {
@@ -263,6 +264,7 @@ function nba_props(array $m, array $db): array
         $cand = [];
         foreach ($players as $pid => $p) {
             if ((string)($p['t'] ?? '') !== $tid) continue;
+            if (isset($skip[baja_key((string)($p['n'] ?? ''))])) continue; // lesionado o en duda: no se le publica nada
             $h = array_values(array_filter($p['h'] ?? [], fn($g) => $g[3] >= 8 && $g[0] < $m['ts']));
             usort($h, fn($a, $b) => $b[0] <=> $a[0]); $h = array_slice($h, 0, 10);
             if (count($h) < 4) continue;
@@ -272,8 +274,13 @@ function nba_props(array $m, array $db): array
         }
         usort($cand, fn($a, $b) => $b[3] <=> $a[3]);
         foreach (array_slice($cand, 0, 5) as [$pid, $name, $h]) {
+            // si faltan compañeros, este jugador recibe parte de lo que ellos producían
+            $bo = $boost[(string)$pid] ?? [];
+            $plus = ['puntos' => $bo['pts'] ?? 0, 'rebotes' => $bo['reb'] ?? 0, 'asistencias' => $bo['ast'] ?? 0, 'triples' => $bo['tri'] ?? 0, 'tiros libres' => $bo['ft'] ?? 0,
+                     'PTS+REB+AST' => ($bo['pts'] ?? 0) + ($bo['reb'] ?? 0) + ($bo['ast'] ?? 0)];
             foreach ($stats as [$sn, $f]) {
                 $v = array_values(array_filter(array_map($f, $h), fn($x) => $x !== null)); $n = count($v);
+                if ($plus[$sn] ?? 0) $v = array_map(fn($x) => $x + $plus[$sn], $v);
                 if ($n < 4) continue; // filas viejas sin el dato (tiros libres) mientras se relee la temporada
                 $mu = array_sum($v) / $n;
                 if ($mu < 1.2) continue; // estadísticas casi en cero no tienen línea útil
