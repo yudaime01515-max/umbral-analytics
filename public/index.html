@@ -1820,6 +1820,16 @@ function nbaLiveCalc(m){
     else if((r=reAT.exec(n))){p=1-nPhi((parseFloat(r[2])-aF)/sdTm);if(r[1]==='menos')p=1-p;}
     if(p!==null&&p>0.005&&p<0.995)mk.push({n:n,p:Math.round(p*10000)/10000});
   });
+  // líneas nuevas alrededor de cómo va el partido (las de antes del partido quedan en 95-99% y no sirven para armar cuotas)
+  var have={};mk.forEach(function(x){have[x.n]=1;});
+  var add=function(n,p){if(!have[n]&&p>0.03&&p<0.97){have[n]=1;mk.push({n:n,p:Math.round(p*10000)/10000});}};
+  for(var k=-3;k<=3;k++){
+    var Lt=Math.round(totF)+0.5+k*3,pt=1-nPhi((Lt-totF)/sdT);add('Más de '+Lt+' puntos',pt);add('Menos de '+Lt+' puntos',1-pt);
+    var Lh=Math.round(hF)+0.5+k*2,ph=1-nPhi((Lh-hF)/sdTm);add(m.home+': más de '+Lh+' puntos',ph);add(m.home+': menos de '+Lh+' puntos',1-ph);
+    var La=Math.round(aF)+0.5+k*2,pa=1-nPhi((La-aF)/sdTm);add(m.away+': más de '+La+' puntos',pa);add(m.away+': menos de '+La+' puntos',1-pa);
+    var Ls=Math.round(Math.abs(muF))+0.5+k*2;if(Ls>0){var fav=muF>=0,pf=nPhi((Math.abs(muF)-Ls)/sdM);
+      add((fav?m.home:m.away)+' -'+Ls,pf);add((fav?m.away:m.home)+' +'+Ls,1-pf);}
+  }
   if(mk.length)LIVE_MK[m.id]={t:el,markets:mk,nba:true,left:T};else delete LIVE_MK[m.id];
 }
 function startLive(){pollLive();clearInterval(liveTimer);liveTimer=setInterval(pollLive,30000);}
@@ -2219,8 +2229,18 @@ function chTargetCombo(text){
   var adj=function(f,m){var g=calGroup(f.sport,m.r&&m.r[0]);return g?m.p*(g.real/g.pred):m.p;};
   var playable=function(f){var st=liveState(f);return st==='pre'||(st==='live'&&isLiveMk(f));};
   if(single){
-    named.sort(function(a,b){return a.ts-b.ts;});var f=named.filter(playable)[0]||named[0],seen={};
-    mkOf(f).forEach(function(m){if(m.p<0.6||m.p>0.95)return;var g=mkGroup(f,m.n),key=g==='Jugadores'?'J:'+m.n.split(':')[0]:g==='Partido'||g==='Resultado y goles'?(m.r&&m.r[0])||m.n:g;pool.push({f:f,m:m,key:key,s:adj(f,m)});});
+    named.sort(function(a,b){return a.ts-b.ts;});
+    if(/\bhoy\b/.test(t)){var td=dayKey(now),hoy=named.filter(function(x){return dayKey(x.ts)===td||liveState(x)==='live';});if(hoy.length)named=hoy;}
+    var f=named.filter(function(x){return liveState(x)==='live';})[0]||named.filter(playable)[0]||named[0],seen={};
+    if(liveState(f)==='live'&&!isLiveMk(f))return null; // en juego pero aún sin mercados en vivo: mejor no usar los de antes del partido
+    // una selección por tipo de mercado: un ganador, un hándicap, un total del partido, un total por equipo, uno por jugador…
+    var fam=function(n){var x=chNorm(n),i=x.indexOf(':');
+      if(/^(gana |empate)/.test(x)||/ o empate$|no hay empate/.test(x))return 'res';
+      if(/ [+-]\d+(\.\d+)?$/.test(x))return 'hcp';
+      if(i>0){var who=x.slice(0,i),rest=x.slice(i+1).replace(/\d+(\.\d+)?/g,'#').replace(/\b(mas|menos)\b/g,'').replace(/\s+/g,' ').trim();
+        if(/^\d|mitad|cuarto|tiempo|periodo/.test(who))return who+'|'+rest;return mkGroup(f,n)==='Jugadores'?'J:'+who:who+'|'+rest;}
+      return x.replace(/\d+(\.\d+)?/g,'#').replace(/\b(mas|menos)\b/g,'').replace(/\s+/g,' ').trim();};
+    mkOf(f).forEach(function(m){if(m.p<0.6||m.p>0.95)return;pool.push({f:f,m:m,key:fam(m.n),s:adj(f,m)});});
     pool.sort(function(a,b){return b.s-a.s;});pool=pool.filter(function(x){if(seen[x.key])return false;seen[x.key]=1;return true;});
   }else{
     var today=/\bhoy\b/.test(t),end=today?(function(){var d=dayKey(now),e=now;while(dayKey(e)===d)e+=1800;return e;})():now+36*3600;
