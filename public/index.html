@@ -2193,7 +2193,7 @@ function chContext(userText,withImg){
     count++;
     var live=liveState(f)==='live',extra=[];
     if(f.formH&&f.formH.length)extra.push('forma '+f.formH.join('').toUpperCase()+' vs '+(f.formA||[]).join('').toUpperCase());
-    if(f.exp)f.exp.forEach(function(x){if(big||/^Bajas/.test(x[0]))extra.push(x[0]+': '+x[1]);});
+    if(f.exp)f.exp.forEach(function(x){if(big||/^(Bajas|Alineación)/.test(x[0]))extra.push(x[0]+': '+x[1]);});
     L.push('['+f.id+'] '+(live?'EN VIVO '+chScore(f):dayLabel(dayKey(f.ts))+' '+timeStr(f.ts))+' · '+chSport(f)+' · '+chShort(f.league,48)+' · '+f.home+' vs '+f.away+(extra.length?' · '+extra.join('; '):'')+'\n   '+out.join(' | '));
   });
   var tc=chTargetCombo(userText);
@@ -2202,7 +2202,7 @@ function chContext(userText,withImg){
   applyInj();
   if(INJ_LIST.length){var teams={};keep.forEach(function(f){if(f.sport==='basquet'){teams[f.home]=1;teams[f.away]=1;}});
     var inj=INJ_LIST.filter(function(i){return teams[i.team];});
-    if(inj.length){L.push('\nBAJAS NBA (reporte oficial vía ESPN). El cerebro YA las usó: quitó los mercados de esos jugadores, bajó los puntos esperados de su equipo (ver "Bajas" en cada partido) y subió las líneas de los compañeros que heredan sus tiros, rebotes y asistencias. Cuando recomiendes un partido con bajas, explícalo (ej. "sin su máximo anotador, X debería tomar más tiros"):');
+    if(inj.length){L.push('\nBAJAS (todas las ligas): en cada partido, las líneas "Bajas (...)" (NBA, NFL, NHL: reporte oficial de lesiones) y "Alineación (...)" (fútbol: titulares confirmados ~1 h antes) ya están metidas en el cálculo del cerebro. Úsalas para explicar (ej. "sin su goleador, X marca menos"). Lista de bajas NBA (reporte oficial vía ESPN). El cerebro YA las usó: quitó los mercados de esos jugadores, bajó los puntos esperados de su equipo (ver "Bajas" en cada partido) y subió las líneas de los compañeros que heredan sus tiros, rebotes y asistencias. Cuando recomiendes un partido con bajas, explícalo (ej. "sin su máximo anotador, X debería tomar más tiros"):');
       inj.forEach(function(i){L.push('- '+i.team+': '+i.n+' · '+((INJ_ST[i.st]||[i.st])[0])+(i.why?' ('+i.why+')':''));});}}
   var nc=chNow().slice(0,10);
   if(nc.length){L.push('\nLO QUE LA PÁGINA RECOMIENDA AHORA ("Métele ahora"):');nc.forEach(function(c){L.push('- ['+c.f.id+'] '+c.m.n+' '+pct(c.m.p)+'%'+(c.live?' (EN VIVO)':' (empieza '+timeStr(c.f.ts)+')')+(c.weak?' · sin jugada clara, mejor esperar':''));});}

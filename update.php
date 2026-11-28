@@ -65,6 +65,14 @@ if (is_file("$dataDir/nba.json") && !getenv('UMBRAL_SIN_BAJAS')) {
     try { $GLOBALS['NBA_BAJAS'] = nba_bajas(json_decode(file_get_contents("$dataDir/nba.json"), true) ?: [], $now); }
     catch (Throwable $e) { log_line('ERROR bajas NBA: ' . $e->getMessage()); }
 }
+// Bajas NFL y NHL (mismo reporte de ESPN) y alineaciones confirmadas de fútbol (se leen partido por partido)
+$GLOBALS['LIGA_BAJAS'] = []; $GLOBALS['FUT_AJ'] = [];
+if (!getenv('UMBRAL_SIN_BAJAS')) {
+    foreach (['nfl' => 'football/nfl', 'hockey' => 'hockey/nhl'] as $k => $path) {
+        if (empty($cfg['sports'][$k]['enabled'])) continue;
+        try { $GLOBALS['LIGA_BAJAS'][$k] = liga_bajas($path); } catch (Throwable $e) { log_line("ERROR bajas $k: " . $e->getMessage()); }
+    }
+}
 file_put_contents("$dataDir/cerebro.json", json_encode($CEREBRO, JSON_UNESCAPED_UNICODE));
 $CAL['w'] = $CEREBRO['activo'] ? $CEREBRO['w'] : null;
 
@@ -136,6 +144,10 @@ foreach ($cfg['sports'] as $sportKey => $sport) {
             if (!in_array($g['status'], NOT_STARTED, true) && $g['status'] !== 'LIVE') continue;
             if ($g['status'] === 'LIVE' && $g['ts'] < $now - 4 * 3600) continue;
             if ($g['ts'] < $startToday - 6 * 3600 || $g['ts'] >= $endWindow) continue;
+            if ($sportKey === 'futbol' && !empty($league['code']) && !getenv('UMBRAL_SIN_BAJAS')) {
+                $slug = $league['slug'] ?? (ESPN_SOCCER_SLUGS[$league['code']] ?? null);
+                if ($slug) { try { $aj = fut_alineacion($g, $league['code'], $slug, $now); if ($aj) { $GLOBALS['FUT_AJ'][$g['id']] = $aj; $nAlin = ($nAlin ?? 0) + 1; } } catch (Throwable $e) { log_line('ERROR alineación: ' . $e->getMessage()); } }
+            }
             $model = model_match($sport, $R, $g);
             if (!$model) continue;
             $model['markets'] = calibrar_markets($model['markets'], $sportKey, $CAL, $oddsEv, $g);
@@ -183,6 +195,7 @@ if (is_file("$dataDir/nba.json")) {
         }
         unset($m);
         log_line("OK props NBA: $np mercados de jugadores");
+        log_line('OK alineaciones fútbol: ' . count($GLOBALS['FUT_AJ'] ?? []) . ' partidos ajustados con su alineación confirmada');
     } catch (Throwable $e) { log_line('ERROR props NBA: ' . $e->getMessage()); }
 }
 

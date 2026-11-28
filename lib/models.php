@@ -89,15 +89,40 @@ function model_match(array $sport, array $R, array $m): ?array
     $la = $R['avgA'] * $ta['att'] * $th['def'];
     $H = $m['home']; $A = $m['away'];
 
-    // NBA: si faltan jugadores que anotan, el equipo anota menos (ver lib/bajas.php)
-    $bj = !empty($sport['players']) && $sport['model'] === 'normal' ? ($GLOBALS['NBA_BAJAS']['teams'] ?? []) : [];
-    $bH = $bj[(string)$m['home_id']] ?? null; $bA = $bj[(string)$m['away_id']] ?? null;
-    if ($bH || $bA) {
+    // Bajas: el cerebro ajusta los puntos/goles esperados según quién no juega (ver lib/bajas.php)
+    $extra = [];
+    $id = (string)($m['id'] ?? '');
+    if (!empty($sport['players']) && $sport['model'] === 'normal') { // NBA
+        $bj = $GLOBALS['NBA_BAJAS']['teams'] ?? [];
+        $bH = $bj[(string)$m['home_id']] ?? null; $bA = $bj[(string)$m['away_id']] ?? null;
         $lh -= $bH['pts'] ?? 0; $la -= $bA['pts'] ?? 0;
-        $res = model_normal($lh, $la, $H, $A, $sport);
-        if ($bH) $res['exp'][] = nba_bajas_exp($H, $bH);
-        if ($bA) $res['exp'][] = nba_bajas_exp($A, $bA);
-        return $res;
+        if ($bH) $extra[] = nba_bajas_exp($H, $bH);
+        if ($bA) $extra[] = nba_bajas_exp($A, $bA);
+    } elseif (preg_match('/^(nfl|hockey)-espn-/', $id, $mm)) { // NFL y NHL
+        $bj = $GLOBALS['LIGA_BAJAS'][$mm[1]] ?? [];
+        $bH = $bj[(string)$m['home_id']] ?? null; $bA = $bj[(string)$m['away_id']] ?? null;
+        if ($sport['model'] === 'normal') { $lh += ($bH['att'] ?? 0) + ($bA['opp'] ?? 0); $la += ($bA['att'] ?? 0) + ($bH['opp'] ?? 0); }
+        else { $lh *= (1 + ($bH['att'] ?? 0)) * (1 + ($bA['opp'] ?? 0)); $la *= (1 + ($bA['att'] ?? 0)) * (1 + ($bH['opp'] ?? 0)); }
+        foreach ([[$H, $bH], [$A, $bA]] as [$nm, $b]) if ($b && $b['list']) {
+            $names = array_map(fn($x) => $x[0] . ' (' . $x[2] . ($x[1] === 'Out' ? '' : ', duda') . ')', array_slice($b['list'], 0, 4));
+            $eff = $b['unit'] === 'pts' ? ($b['att'] < -0.2 ? ' · −' . number_format(-$b['att'], 1) . ' pts' : '') : ($b['att'] < -0.01 ? ' · −' . round(-$b['att'] * 100) . '% goles' : '');
+            $extra[] = ["Bajas ($nm)", implode(', ', $names) . $eff];
+        }
+    } elseif ($sport['model'] === 'poisson_draw' && !empty($GLOBALS['FUT_AJ'][$id])) { // fútbol: alineación confirmada
+        $aj = $GLOBALS['FUT_AJ'][$id];
+        $lh *= ($aj['h']['att'] ?? 1) * ($aj['a']['opp'] ?? 1);
+        $la *= ($aj['a']['att'] ?? 1) * ($aj['h']['opp'] ?? 1);
+        if (isset($aj['h'])) $extra[] = fut_alineacion_exp($H, $aj['h']);
+        if (isset($aj['a'])) $extra[] = fut_alineacion_exp($A, $aj['a']);
+    }
+    if ($extra) {
+        $res = null;
+        switch ($sport['model']) {
+            case 'poisson_draw': $res = model_football($lh, $la, $H, $A); break;
+            case 'poisson_ot':   $res = model_poisson_ot($lh, $la, $H, $A, $sport); break;
+            case 'normal':       $res = model_normal($lh, $la, $H, $A, $sport); break;
+        }
+        if ($res) { $res['exp'] = array_merge($res['exp'], $extra); return $res; }
     }
 
     switch ($sport['model']) {
